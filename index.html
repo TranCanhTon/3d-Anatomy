@@ -1,0 +1,36 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+  <meta name="theme-color" content="#1f1c1a">
+  <title>Muscle Model Viewer</title>
+  <link rel="preload" href="fonts/BarlowCondensed-Bold.ttf" as="font" type="font/ttf" crossorigin>
+  <link rel="stylesheet" href="styles.css">
+  <script type="importmap">{"imports":{"three":"./vendor/three.module.js","three/addons/":"./vendor/"}}</script>
+</head>
+<body>
+  <main id="stage" data-phase="loading">
+    <div id="drag-title" aria-hidden="true">DRAG THE FACE</div>
+    <div id="muscle-name" aria-hidden="true">
+      <div class="name-layer"><div class="name-main"></div><div class="name-part"></div></div>
+      <div class="name-layer"><div class="name-main"></div><div class="name-part"></div></div>
+    </div>
+    <canvas id="c" tabindex="0" aria-label="Interactive anatomy. Grab the face and pull to peel the skin and reveal the muscles, or use Explore muscles. After revealing, drag left or right to rotate and scroll to zoom."></canvas>
+    <div class="edge top">
+      <div class="identity"><h1>Muscle model</h1><p>ANATOMY / IN MOTION</p></div>
+      <button id="skin" type="button" disabled>Explore muscles</button>
+    </div>
+    <div id="modesty" hidden aria-hidden="true"></div>
+    <div class="edge bottom">
+      <span class="step" id="step">01 / REVEAL</span>
+      <div id="instruction" aria-live="polite">Grab the face and pull</div>
+      <span class="gesture" id="gesture">GRAB THE FACE · PULL</span>
+    </div>
+    <div id="tension" aria-hidden="true"><span></span></div>
+    <div id="load" role="status"><span class="loading-line"></span><span id="load-text">Loading anatomy</span></div>
+    <div id="announcement" class="sr-only" aria-live="polite" aria-atomic="true"></div>
+  </main>
+  <script type="module" src="app.js"></script>
+</body>
+</html>
