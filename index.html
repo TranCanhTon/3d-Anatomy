@@ -25,8 +25,26 @@
     <div class="edge bottom">
       <span class="step" id="step">01 / REVEAL</span>
       <div id="instruction" aria-live="polite">Grab the face and pull</div>
+      <div id="ex-controls" hidden>
+        <button id="ex-pause" type="button">Pause</button><button id="ex-slow" type="button">Slow motion</button><button id="ex-xray" type="button">X-ray: off</button>
+        <div class="rep" aria-hidden="true"><div id="ex-bar"></div></div>
+      </div>
       <span class="gesture" id="gesture">GRAB THE FACE · PULL</span>
     </div>
+    <button id="watch" type="button" hidden><span class="play" aria-hidden="true"></span>Watch the exercise<span id="watch-name"></span></button>
+    <aside id="ex-panel" hidden>
+      <p class="kicker">Now playing</p>
+      <h2 id="ex-title"></h2>
+      <p class="kicker">Working</p>
+      <ol id="ex-working"></ol>
+    </aside>
+    <aside id="xray-panel" hidden>
+      <p class="kicker">Muscle length now vs rest</p>
+      <div class="key"><span class="k-short">shorter</span><span class="k-long">longer</span><span class="k-work">working</span></div>
+      <ul id="xray-rows"></ul>
+      <p class="note">Each muscle is a line through 3 points stuck to bones: origin, middle, insertion. Hover a row to find its line.</p>
+    </aside>
+    <div id="veil" aria-hidden="true"></div>
     <div id="tension" aria-hidden="true"><span></span></div>
     <div id="load" role="status"><span class="loading-line"></span><span id="load-text">Loading anatomy</span></div>
     <div id="announcement" class="sr-only" aria-live="polite" aria-atomic="true"></div>

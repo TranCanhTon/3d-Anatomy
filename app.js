@@ -3,6 +3,8 @@ import { GLTFLoader } from "three/addons/loaders/GLTFLoader.js";
 import { OrbitControls } from "three/addons/controls/OrbitControls.js";
 import { mats, prep, maskUniforms } from "./muscle-materials.js";
 import { SkinPeel, bakeSkin } from "./skin-peel.js";
+import { ExerciseMode, MUSCLE_EXERCISE, muscleLabel } from "./exercise-mode.js";
+import { EXERCISES } from "./prototype/exercises.js";
 
 const $ = (id) => document.getElementById(id);
 const canvas = $("c"),
@@ -151,6 +153,7 @@ let body,
   dirty = true,
   hovered = null,
   selected = null,
+  exercise = null,
   down = null,
   pendingPointer = null,
   lastPointer = null;
@@ -240,16 +243,18 @@ function showName(value) {
     nice(group) + (part !== group ? ", " + nice(part) : "");
 }
 
-const black = new THREE.Color(0),
-  hoverColor = new THREE.Color("#631913"),
-  selectedColor = new THREE.Color("#a53724");
+// highlight: the muscle blends toward teal (muscle-materials.js), stronger when selected
 function paint() {
+  if (exercise?.active) {
+    // exercise mode paints the working muscles itself; the name stays on the chosen muscle
+    showName(selected);
+    dirty = true;
+    return;
+  }
   mats.forEach((m, key) => {
-    m.emissive.copy(
-      key === selected ? selectedColor : key === hovered ? hoverColor : black,
-    );
-    m.emissiveIntensity = key === selected ? 0.3 : 0.27;
+    m.userData.uHi.value = key === selected ? 0.82 : key === hovered ? 0.42 : 0;
   });
+  updateWatch();
   showName(peel?.canExplore ? hovered || selected : null);
   dirty = true;
 }
@@ -257,7 +262,7 @@ function paint() {
 const ray = new THREE.Raycaster(),
   pointer = new THREE.Vector2();
 function pick(event) {
-  if (!body || !peel?.canExplore) return null;
+  if (!body || !peel?.canExplore || exercise?.active) return null;
   const box = canvas.getBoundingClientRect();
   pointer.set(
     ((event.clientX - box.left) / box.width) * 2 - 1,
@@ -289,6 +294,8 @@ function phaseChanged(phase, canExplore) {
     animateCamera(fullView(), 2.8, 0.16);
   }
   if (canExplore) {
+    // build the exercise model in the background once the intro camera move is done
+    setTimeout(() => exercise?.init(), 3200);
     pendingPointer = lastPointer;
     instruction.textContent = matchMedia("(hover: hover)").matches
       ? "Point at a muscle to explore"
@@ -344,6 +351,8 @@ Promise.all([load("muscles.json"), load("skin.json")])
       skin.userData.skin.geometry.index.count / 3 +
       skin.userData.mouth.geometry.index.count / 3;
     scene.add(body, skin);
+    exercise = new ExerciseMode({ scene, body, renderer, camera });
+    exercise.onFinish = exerciseFinished;
     peel = new SkinPeel({
       mesh: skin,
       scene,
@@ -396,6 +405,7 @@ function clampTarget(r) {
   t.y = THREE.MathUtils.clamp(t.y, 0.86 - a, 0.86 + a);
 }
 function zoomAt(clientX, clientY, factor) {
+  if (exercise?.active) return exerciseZoom(clientX, clientY, factor);
   if (!peel?.canExplore || camAnim) return;
   camOffset.copy(camera.position).sub(controls.target);
   const r = camOffset.length(),
@@ -438,20 +448,22 @@ function zoomAt(clientX, clientY, factor) {
 canvas.addEventListener(
   "wheel",
   (event) => {
-    if (!peel?.canExplore) return;
+    if (!peel?.canExplore && !exercise?.active) return;
     event.preventDefault();
     zoomAt(event.clientX, event.clientY, Math.exp(event.deltaY * 0.0012));
   },
   { passive: false },
 );
 function panVertical(dyPx) {
+  if (exercise?.active && (camAnim || exercise.phase !== "play")) return;
   camOffset.copy(camera.position).sub(controls.target);
   const r = camOffset.length(),
     perPx =
       (2 * r * Math.tan(THREE.MathUtils.degToRad(camera.fov) / 2)) /
       stage.clientHeight;
   controls.target.y += dyPx * perPx;
-  clampTarget(r);
+  if (exercise?.active) clampExercise(r);
+  else clampTarget(r);
   camera.position.copy(controls.target).add(camOffset);
   controls.update();
   dirty = true;
@@ -508,7 +520,7 @@ canvas.addEventListener("pointerup", (event) => {
     const moved =
       Math.hypot(event.clientX - down.x, event.clientY - down.y) > 6;
     down = null;
-    if (!moved) {
+    if (!moved && !exercise?.active) {
       const value = pick(event);
       selected = value === selected ? null : value;
       hovered = value;
@@ -540,6 +552,7 @@ canvas.addEventListener("pointerleave", () => {
 });
 button.addEventListener("click", () => {
   if (!peel) return;
+  if (exercise?.active) return closeExercise();
   hovered = selected = null;
   down = null;
   paint();
@@ -571,11 +584,12 @@ canvas.addEventListener("keydown", (event) => {
     event.preventDefault();
     return;
   } else if (event.key === "Escape") {
+    if (exercise?.active) return closeExercise();
     hovered = selected = null;
     paint();
     return;
   } else if (event.key === "Home") {
-    if (!camAnim) controls.reset();
+    if (!camAnim && !exercise?.active) controls.reset();
     return;
   } else return;
   event.preventDefault();
@@ -584,6 +598,194 @@ canvas.addEventListener("keydown", (event) => {
   controls.update();
   dirty = true;
 });
+
+// ---- Exercise mode: the chosen muscle's exercise, done by the explore model itself
+const watch = $("watch"),
+  panel = $("ex-panel"),
+  veilEl = $("veil");
+function updateWatch() {
+  const name = peel?.canExplore && !exercise?.active && selected && MUSCLE_EXERCISE[selected];
+  watch.hidden = !name;
+  if (name) $("watch-name").textContent = EXERCISES[name].title;
+  // hint which muscles have an exercise
+  if (peel?.canExplore && !exercise?.active)
+    instruction.textContent = name
+      ? "Or pick another muscle"
+      : hovered && MUSCLE_EXERCISE[hovered]
+        ? "Click to see its exercise"
+        : matchMedia("(hover: hover)").matches
+          ? "Point at a muscle to explore"
+          : "Tap a muscle to explore";
+}
+const veil = (on) =>
+  new Promise((done) => {
+    veilEl.classList.toggle("on", on);
+    setTimeout(done, reducedMotion ? 0 : 320);
+  });
+let exploreView = null;
+async function openExercise() {
+  const name = MUSCLE_EXERCISE[selected];
+  if (!name || exercise.active || exercise.busy) return;
+  exercise.busy = true;
+  watch.hidden = true;
+  instruction.textContent = "Getting the exercise ready";
+  const info = await exercise.prepare(name);
+  exploreView = readCam();
+  controls.maxDistance = 7; // exercise views sit further out than explore allows
+  camMode = "exercise";
+  stage.dataset.mode = "exercise";
+  if (info.cut) {
+    // the body moves too far to blend (lying down on a bench): hide the jump behind a quick fade
+    await veil(true);
+    exercise.start();
+    applyCam(info.view);
+    lockPolar(info.view.phi);
+    controls.update();
+    dirty = true;
+    await veil(false);
+  } else {
+    exercise.start();
+    animateCamera(info.view, 1.4, 0.1);
+  }
+  exerciseBase = info.view;
+  $("ex-title").textContent = info.title;
+  $("ex-working").innerHTML = info.ranked
+    .slice(0, 4)
+    .map(([k, v]) => `<li><span style="--w:${v}"></span>${muscleLabel(k)}</li>`)
+    .join("");
+  panel.hidden = false;
+  $("ex-controls").hidden = false;
+  $("step").textContent = "03 / EXERCISE";
+  $("gesture").textContent = "DRAG TO TURN · SCROLL TO ZOOM";
+  button.textContent = "Back to explore";
+  exercise.busy = false;
+  dirty = true;
+}
+async function closeExercise() {
+  if (!exercise?.active || exercise.phase === "out" || exercise.busy) return;
+  exercise.busy = true;
+  panel.hidden = true;
+  $("ex-controls").hidden = true;
+  resetExerciseControls();
+  camMode = "full";
+  if (exercise.cut) {
+    await veil(true);
+    exercise.close();
+    exercise.update(0);
+    applyCam(exploreView);
+    lockPolar(exploreView.phi);
+    controls.update();
+    dirty = true;
+    await veil(false);
+  } else {
+    exercise.close();
+    animateCamera(exploreView, 1.0, -0.08);
+  }
+  exercise.busy = false;
+}
+function exerciseFinished() {
+  delete stage.dataset.mode;
+  controls.maxDistance = 4.6;
+  phaseChanged(peel.phase, peel.canExplore);
+  paint();
+}
+watch.addEventListener("click", openExercise);
+// Escape leaves an exercise wherever the keyboard focus is (the explore keys need the canvas focused)
+window.addEventListener("keydown", (event) => {
+  if (event.key === "Escape" && exercise?.active && event.target !== canvas) closeExercise();
+});
+// playback controls: pause, slow motion, X-ray (off, bones, muscle lines, both), rep bar
+$("ex-pause").addEventListener("click", () => {
+  exercise.paused = !exercise.paused;
+  $("ex-pause").textContent = exercise.paused ? "Play" : "Pause";
+});
+$("ex-slow").addEventListener("click", () => {
+  exercise.speed = exercise.speed === 1 ? 0.3 : 1;
+  $("ex-slow").textContent = exercise.speed === 1 ? "Slow motion" : "Normal speed";
+});
+const XRAY_MODES = ["off", "bones", "lines", "both"],
+  XRAY_TEXT = { off: "X-ray: off", bones: "X-ray: bones", lines: "X-ray: muscle lines", both: "X-ray: both" };
+function setXray(mode) {
+  exercise.xray.setMode(mode);
+  $("ex-xray").textContent = XRAY_TEXT[mode];
+  $("xray-panel").hidden = !(mode === "lines" || mode === "both");
+  if (mode === "off") delete stage.dataset.xray;
+  else stage.dataset.xray = mode;
+  if (mode !== "off") drawXrayPanel();
+  dirty = true;
+}
+$("ex-xray").addEventListener("click", () =>
+  setXray(XRAY_MODES[(XRAY_MODES.indexOf(exercise.xray.mode) + 1) % XRAY_MODES.length]),
+);
+function resetExerciseControls() {
+  exercise.paused = false;
+  exercise.speed = 1;
+  $("ex-pause").textContent = "Pause";
+  $("ex-slow").textContent = "Slow motion";
+  if (exercise.xray && exercise.xray.mode !== "off") setXray("off");
+}
+// X-ray side panel: every muscle whose length changed right now; hover a row to find its line
+let lastXrayPanel = 0;
+function drawXrayPanel() {
+  const rows = exercise.xray.rows().slice(0, 14);
+  $("xray-rows").innerHTML =
+    rows
+      .map(({ key, change }) => {
+        const pct = (change * 100).toFixed(1),
+          w = Math.min(1, Math.abs(change) / 0.3);
+        return `<li data-key="${key}" class="${change < 0 ? "short" : "long"}${exercise.effort[key] ? " work" : ""}${exercise.xray.focus === key ? " focus" : ""}">
+      <span class="n">${muscleLabel(key)}</span><span class="b"><i style="--w:${w}"></i></span><span class="v">${change < 0 ? "" : "+"}${pct}%</span></li>`;
+      })
+      .join("") || '<li class="empty">No muscle has changed length</li>';
+}
+$("xray-rows").addEventListener("mouseover", (event) => {
+  const li = event.target.closest("li[data-key]");
+  exercise.xray.focus = li ? li.dataset.key : null;
+});
+$("xray-rows").addEventListener("mouseleave", () => {
+  exercise.xray.focus = null;
+});
+function updateExerciseHud() {
+  $("ex-bar").style.transform = `scaleX(${exercise.k})`;
+  const panelOn = exercise.xray.mode === "lines" || exercise.xray.mode === "both";
+  if (panelOn && performance.now() - lastXrayPanel > 120) {
+    lastXrayPanel = performance.now();
+    drawXrayPanel();
+  }
+}
+// Zoom in exercise mode: toward the point under the cursor, out back toward the exercise's own
+// framing; the view can't wander more than about a metre from it.
+let exerciseBase = null;
+function clampExercise(r) {
+  const t = controls.target,
+    base = exerciseBase.target,
+    reach = 0.25 + 0.75 * THREE.MathUtils.clamp((exerciseBase.radius - r) / (exerciseBase.radius - 0.8), 0, 1);
+  const d = t.clone().sub(base);
+  if (d.length() > reach) t.copy(base).addScaledVector(d.normalize(), reach);
+}
+function exerciseZoom(clientX, clientY, factor) {
+  if (camAnim || exercise.phase !== "play") return;
+  camOffset.copy(camera.position).sub(controls.target);
+  const r = camOffset.length(),
+    nr = THREE.MathUtils.clamp(r * factor, 0.8, Math.max(6, exerciseBase.radius * 1.4));
+  if (Math.abs(nr - r) < 1e-5) return;
+  if (nr < r) {
+    const box = canvas.getBoundingClientRect();
+    zoomNdc.set(((clientX - box.left) / box.width) * 2 - 1, 1 - ((clientY - box.top) / box.height) * 2);
+    zoomRay.setFromCamera(zoomNdc, camera);
+    viewPlane.setFromNormalAndCoplanarPoint(camOffset.clone().normalize(), controls.target);
+    if (zoomRay.ray.intersectPlane(viewPlane, zoomPoint)) controls.target.lerp(zoomPoint, 1 - nr / r);
+  } else
+    controls.target.lerp(
+      exerciseBase.target,
+      THREE.MathUtils.clamp((nr - r) / Math.max(exerciseBase.radius - r, 0.001), 0, 1),
+    );
+  camOffset.setLength(nr);
+  clampExercise(nr);
+  camera.position.copy(controls.target).add(camOffset);
+  controls.update();
+  dirty = true;
+}
 
 function resize() {
   const w = stage.clientWidth,
@@ -660,7 +862,7 @@ renderer.setAnimationLoop((time) => {
   previousTime = time;
   const moving = stepCamera(Math.min(raw, 0.1));
   if (!moving) controls.update();
-  const active = peel?.update(dt) || false || moving;
+  const active = (peel?.update(dt) || false) | (exercise?.update(dt) || false) || moving;
   if (pendingPointer && !down && peel?.canExplore) {
     const value = pick(pendingPointer);
     pendingPointer = null;
@@ -670,6 +872,7 @@ renderer.setAnimationLoop((time) => {
       paint();
     }
   }
+  if (exercise?.active) updateExerciseHud();
   if (dirty || active) {
     renderer.render(scene, camera);
     placeModesty();
@@ -703,6 +906,7 @@ Object.defineProperty(window, "anatomyMetrics", {
     side: peel?.side,
     hovered,
     selected,
+    exercise: exercise?.active ? exercise.phase : "off",
     drawCalls: renderer.info.render.calls,
     triangles: renderer.info.render.triangles,
     muscleTriangles,
@@ -715,3 +919,19 @@ Object.defineProperty(window, "anatomyMetrics", {
     programs: renderer.info.programs.length,
   }),
 });
+
+// Test hooks for headless checks, only with ?test in the URL.
+if (new URLSearchParams(location.search).has("test"))
+  window.anatomyTest = {
+    select(key) {
+      selected = hovered = key;
+      paint();
+    },
+    open: () => openExercise(),
+    close: () => closeExercise(),
+    view: (v) => {
+      applyCam({ ...v, target: new THREE.Vector3(...v.target) });
+      controls.update();
+      dirty = true;
+    },
+  };

@@ -38,8 +38,18 @@ Use a local HTTP server rather than double-clicking `index.html`.
     the head down, raw and bloody on the inside,
   - after a downward or upward rip it greys, crumbles and blows away as dust,
     all over the body at once.
-- Hover a muscle to fade its group name in behind the head. Click to keep a
-  selection. On a phone, tap to select.
+- Hover a muscle to fade its group name in behind the head and tint it teal.
+  Click to keep a selection. On a phone, tap to select.
+- Muscles with an exercise (biceps, front shoulders, lats, chest) show a
+  **Watch the exercise** button when selected. The same model then does the
+  exercise: the other muscles dim, the camera swings round, the equipment
+  fades in, and the working muscles pulse teal with each rep. The bench press
+  cuts with a quick fade, since lying down is too far to blend. In the
+  exercise: **Pause**, **Slow motion**, **X-ray** (bones, muscle lines with a
+  panel of length changes, or both), a rep progress bar, scroll to zoom toward
+  the cursor and drag up or down to move. **Back to explore** or Escape
+  returns to the same view. The exercises come from the
+  prototype (`prototype/`), see its README.
 - Drag horizontally to rotate. Scroll to zoom toward whatever is under the
   cursor; once zoomed in, drag up or down to move along the body. Zooming
   back out recentres the full body.
@@ -53,7 +63,10 @@ Use a local HTTP server rather than double-clicking `index.html`.
 
 - `app.js`: loading, camera, selection, background labels, render scheduling.
 - `skin-peel.js`: skin material, face pulls, expressions, the rip, the peel and the dust.
-- `muscle-materials.js`: the supplied viewer's muscle material treatment.
+- `muscle-materials.js`: the supplied viewer's muscle material treatment, plus the teal highlight,
+  dimming and contraction bulge used by explore and exercise mode.
+- `exercise-mode.js`: the explore model doing an exercise. Makes a skinned copy of the muscles with
+  the rig from `prototype/`, plays the clip, blends in and out, places the equipment.
 - `styles.css`: layout, typography, fades, responsive styling.
 - `vendor/`, `fonts/`: local runtime dependencies and their licenses.
 
