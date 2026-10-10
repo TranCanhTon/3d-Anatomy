@@ -4,6 +4,10 @@ An updated version of the supplied viewer, with large fading muscle labels behin
 the body and a drag-to-tear skin introduction. Three.js and the font are
 included locally; no npm install, build step, or external CDN is required.
 
+**Live:** https://trancanhton.github.io/3d-Anatomy/ (exercise prototype:
+https://trancanhton.github.io/3d-Anatomy/prototype/). Hosted on GitHub Pages
+straight from `main`; there is nothing to build.
+
 ## Run
 
 Extract this folder, open a terminal inside it, and run:
