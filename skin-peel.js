@@ -84,7 +84,7 @@ const isDust = (side) => side === 2 || side === 3;
 // same front is used by the muscle shader, so muscles appear exactly where the
 // skin has come off.
 // ---------------------------------------------------------------------------
-export const PEEL_STRIPS = 2;
+export const PEEL_STRIPS = 3;
 const PEEL_DONE = 2.4; // seconds until both halves have peeled past the feet and faded
 export const peelGLSL = `
 uniform float uPeel;
