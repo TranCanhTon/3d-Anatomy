@@ -1,23 +1,39 @@
-import * as THREE from 'three';
+import * as THREE from "three";
 
 const clamp = THREE.MathUtils.clamp;
-const smooth = (x) => { x = clamp(x, 0, 1); return x * x * (3 - 2 * x); };
+const smooth = (x) => {
+  x = clamp(x, 0, 1);
+  return x * x * (3 - 2 * x);
+};
 const band = (x, a, b) => smooth((x - a) / (b - a));
 
 // Landmarks of the MakeHuman head, in model space (metres, +Z faces the camera).
-const EYE = { x: .0299, y: 1.593, z: .0686 };
-const FACE = { chinY: 1.465, mouthY: 1.500, noseY: 1.551, noseZ: .115, eyeY: 1.593, topY: 1.703 };
+const EYE = { x: 0.0299, y: 1.593, z: 0.0686 };
+const FACE = {
+  chinY: 1.465,
+  mouthY: 1.5,
+  noseY: 1.551,
+  noseZ: 0.115,
+  eyeY: 1.593,
+  topY: 1.703,
+};
 
 // The two fixed grab points: one on each cheek. Pulling left drags the left
 // point out to the left, pulling right drags the right point out to the right.
 const GRAB = {
-  point: (side) => side === 2 ? new THREE.Vector3(0, 1.66, .085)
-                 : side === 3 ? new THREE.Vector3(0, 1.551, .115)
-                 : new THREE.Vector3(side * .058, 1.535, .062),
-  dir: (side) => side === 2 ? new THREE.Vector3(0, -1, .3).normalize()
-               : side === 3 ? new THREE.Vector3(0, 1, .35).normalize()
-               : new THREE.Vector3(side * 1, .18, .38).normalize(),
-  reach: (side) => side === 2 ? .055 : side === 3 ? .085 : .13, // metres the grab point travels at the breaking point
+  point: (side) =>
+    side === 2
+      ? new THREE.Vector3(0, 1.66, 0.085)
+      : side === 3
+        ? new THREE.Vector3(0, 1.551, 0.115)
+        : new THREE.Vector3(side * 0.058, 1.535, 0.062),
+  dir: (side) =>
+    side === 2
+      ? new THREE.Vector3(0, -1, 0.3).normalize()
+      : side === 3
+        ? new THREE.Vector3(0, 1, 0.35).normalize()
+        : new THREE.Vector3(side * 1, 0.18, 0.38).normalize(),
+  reach: (side) => (side === 2 ? 0.055 : side === 3 ? 0.085 : 0.13), // metres the grab point travels at the breaking point
 };
 
 // ---------------------------------------------------------------------------
@@ -59,7 +75,7 @@ float dNoise(vec3 x){vec3 i=floor(x),f=fract(x);f=f*f*(3.0-2.0*f);
              mix(mix(dHash(i+vec3(0,0,1)),dHash(i+vec3(1,0,1)),f.x),mix(dHash(i+vec3(0,1,1)),dHash(i+vec3(1,1,1)),f.x),f.y),f.z);}
 float dustLow(vec3 p){ return 0.25 + 0.8 * clamp((dNoise(p * 9.0) * 0.65 + dNoise(p * 23.0 + 5.0) * 0.35 - 0.22) / 0.56, 0.0, 1.0); }
 float dustTime(vec3 p){ return dustLow(p) + (dNoise(p * 140.0) - 0.5) * 0.18 + (dNoise(p * 420.0) - 0.5) * 0.08; }`;
-const isDust = side => side === 2 || side === 3;
+const isDust = (side) => side === 2 || side === 3;
 
 // ---------------------------------------------------------------------------
 // Banana peel. After the tear the skin splits down the middle of the body,
@@ -86,12 +102,18 @@ float peelFront(float phi){
 }`;
 export function peelFrontJS(phi, t, pulledSide = 0) {
   if (t < 0) return 99;
-  if (isDust(pulledSide)) return t > .5 ? -99 : 99;
+  if (isDust(pulledSide)) return t > 0.5 ? -99 : 99;
   const side = phi >= 0 ? 1 : -1;
-  const delay = pulledSide >= 2 ? Math.pow(Math.abs(phi) / Math.PI, 1.2) * .35
-              : (pulledSide === 0 ? .05 : (side === pulledSide ? 0 : .13));
+  const delay =
+    pulledSide >= 2
+      ? Math.pow(Math.abs(phi) / Math.PI, 1.2) * 0.35
+      : pulledSide === 0
+        ? 0.05
+        : side === pulledSide
+          ? 0
+          : 0.13;
   const s = Math.max(t - delay, 0);
-  return 1.76 - (.35 * s + .78 * s * s);
+  return 1.76 - (0.35 * s + 0.78 * s * s);
 }
 
 // ---------------------------------------------------------------------------
@@ -205,20 +227,39 @@ const peelFragmentGLSL = `
         if (holes < smoothstep(0.4, 0.8, vPeelD) * 1.05) discard;
       }`;
 
-function patch(material, uniforms, key, { vertexHeader = '', fragmentHeader = '', color = '', extra = s => s } = {}) {
+function patch(
+  material,
+  uniforms,
+  key,
+  { vertexHeader = "", fragmentHeader = "", color = "", extra = (s) => s } = {},
+) {
   material.customProgramCacheKey = () => key;
-  material.onBeforeCompile = shader => {
+  material.onBeforeCompile = (shader) => {
     Object.assign(shader.uniforms, uniforms);
-    shader.vertexShader = shader.vertexShader.replace('#include <common>', `#include <common>
+    shader.vertexShader = shader.vertexShader
+      .replace(
+        "#include <common>",
+        `#include <common>
       varying vec3 vSkinRest;
       varying float vPeelD;
       varying float vPhi;
       ${vertexHeader}
       ${peelGLSL}
       ${headGLSL}
-    `).replace('#include <morphnormal_vertex>', `#include <morphnormal_vertex>\n${peelNormalGLSL}\n`)
-      .replace('#include <morphtarget_vertex>', `#include <morphtarget_vertex>\n${peelVertexGLSL('position')}\n`);
-    shader.fragmentShader = shader.fragmentShader.replace('#include <common>', `#include <common>
+    `,
+      )
+      .replace(
+        "#include <morphnormal_vertex>",
+        `#include <morphnormal_vertex>\n${peelNormalGLSL}\n`,
+      )
+      .replace(
+        "#include <morphtarget_vertex>",
+        `#include <morphtarget_vertex>\n${peelVertexGLSL("position")}\n`,
+      );
+    shader.fragmentShader = shader.fragmentShader
+      .replace(
+        "#include <common>",
+        `#include <common>
       varying vec3 vSkinRest;
       varying float vPeelD;
       varying float vPhi;
@@ -227,8 +268,13 @@ function patch(material, uniforms, key, { vertexHeader = '', fragmentHeader = ''
       ${fragmentHeader}
       ${skinNoiseGLSL}
       ${dustGLSL}
-    `).replace('void main() {', `void main() {${peelFragmentGLSL}`)
-      .replace('#include <color_fragment>', `#include <color_fragment>\n${color}\n`);
+    `,
+      )
+      .replace("void main() {", `void main() {${peelFragmentGLSL}`)
+      .replace(
+        "#include <color_fragment>",
+        `#include <color_fragment>\n${color}\n`,
+      );
     extra(shader);
   };
   return material;
@@ -246,7 +292,8 @@ const dustTintGLSL = `
         tone = mix(tone, ash, max(smoothstep(0.0, 0.35, uPeel) * 0.35, 1.0 - smoothstep(0.0, 0.45, left)));
         tone *= 1.0 - 0.45 * (1.0 - smoothstep(0.0, 0.05, left));
       }`;
-const SKIN_SHELLS = 4, SKIN_THICK = .0055;
+const SKIN_SHELLS = 4,
+  SKIN_THICK = 0.0055;
 const shellColorGLSL = `
       vec3 r = vSkinRest;
       float torn = tornRegion(r);
@@ -267,18 +314,29 @@ const shellColorGLSL = `
       if (!gl_FrontFacing) tone *= 0.55;
       diffuseColor.rgb = tone;`;
 
-function skinMaterial(uniforms, key = 'mh-skin-v2', shell = false) {
+function skinMaterial(uniforms, key = "mh-skin-v2", shell = false) {
   const material = new THREE.MeshPhysicalMaterial({
-    color: '#c39079', roughness: .62, metalness: 0,
-    specularIntensity: .22, specularColor: new THREE.Color('#ffe6dc'),
+    color: "#c39079",
+    roughness: 0.62,
+    metalness: 0,
+    specularIntensity: 0.22,
+    specularColor: new THREE.Color("#ffe6dc"),
     side: THREE.DoubleSide,
   });
-  if (shell) material.defines = { SKIN_SHELL: '' };
-  const shellUniform = shell ? ' uniform float uShell;' : '';
+  if (shell) material.defines = { SKIN_SHELL: "" };
+  const shellUniform = shell ? " uniform float uShell;" : "";
   return patch(material, uniforms, key, {
-    vertexHeader: 'attribute vec4 skinTag; varying float vCavity; uniform float uTornKeep; uniform float uTornTime;' + shellUniform + tornGLSL,
-    fragmentHeader: 'varying float vCavity; uniform float uTension; uniform vec3 uGrab; uniform float uExpr; uniform float uTornKeep; uniform float uTornTime; uniform float uPieceFade;' + shellUniform + tornGLSL,
-    color: shell ? shellColorGLSL : `
+    vertexHeader:
+      "attribute vec4 skinTag; varying float vCavity; uniform float uTornKeep; uniform float uTornTime;" +
+      shellUniform +
+      tornGLSL,
+    fragmentHeader:
+      "varying float vCavity; uniform float uTension; uniform vec3 uGrab; uniform float uExpr; uniform float uTornKeep; uniform float uTornTime; uniform float uPieceFade;" +
+      shellUniform +
+      tornGLSL,
+    color: shell
+      ? shellColorGLSL
+      : `
       vec3 r = vSkinRest;
       // the torn piece: the body keeps everything outside it, the falling piece only what is inside
       float torn = tornRegion(r);
@@ -379,9 +437,15 @@ function skinMaterial(uniforms, key = 'mh-skin-v2', shell = false) {
       tone = mix(tone, blood, wet);
       ${dustTintGLSL}
       diffuseColor.rgb = tone;`,
-    extra: shader => {
-      shader.vertexShader = shader.vertexShader.replace('vSkinRest = position;', 'vSkinRest = position; vCavity = skinTag.y;')
-        .replace('#include <project_vertex>', `
+    extra: (shader) => {
+      shader.vertexShader = shader.vertexShader
+        .replace(
+          "vSkinRest = position;",
+          "vSkinRest = position; vCavity = skinTag.y;",
+        )
+        .replace(
+          "#include <project_vertex>",
+          `
           if (uTornSide != 0.0 && uTornKeep < 0.5) {
             float tr = tornRegion(position);
             float lip = (1.0 - smoothstep(0.0, 0.014, -tr)) * step(tr, 0.0) * smoothstep(0.0, 0.25, uTornTime);
@@ -394,13 +458,21 @@ function skinMaterial(uniforms, key = 'mh-skin-v2', shell = false) {
           #ifdef SKIN_SHELL
           // the layers only exist along the cut: everything else is thrown out before it is drawn
           if (uTornSide == 0.0 || abs(tornRegion(position)) > 0.03) gl_Position = vec4(0.0, 0.0, -2.0, 1.0);
-          #endif`);
-      shader.fragmentShader = shader.fragmentShader.replace('#include <roughnessmap_fragment>', `#include <roughnessmap_fragment>
+          #endif`,
+        );
+      shader.fragmentShader = shader.fragmentShader
+        .replace(
+          "#include <roughnessmap_fragment>",
+          `#include <roughnessmap_fragment>
         roughnessFactor = clamp(roughnessFactor * (0.85 + 0.3 * sNoise(vSkinRest * 40.0)), 0.4, 0.9);
         roughnessFactor = mix(roughnessFactor, 0.3, vCavity);
         if (uPeelSide > 1.5 && uPeel >= 0.0) roughnessFactor = mix(roughnessFactor, 0.95, smoothstep(0.0, 0.4, uPeel));
         if (uTornSide != 0.0) roughnessFactor = mix(roughnessFactor, 0.18, 1.0 - smoothstep(0.0, 0.01, abs(tornRegion(vSkinRest))));
-      `).replace('#include <normal_fragment_maps>', `#include <normal_fragment_maps>
+      `,
+        )
+        .replace(
+          "#include <normal_fragment_maps>",
+          `#include <normal_fragment_maps>
         {
           vec3 pr = vSkinRest;
           float hgt = sFbm(pr * 140.0) * 0.0028 + sNoise(pr * 900.0) * 0.0012;
@@ -415,22 +487,34 @@ function skinMaterial(uniforms, key = 'mh-skin-v2', shell = false) {
           if (dot(g, g) > 1e-8) normal = normalize(mix(normal, -normalize(g), 0.7));
         }
         #endif
-      `).replace('#include <opaque_fragment>', `
+      `,
+        )
+        .replace(
+          "#include <opaque_fragment>",
+          `
         // light that enters the skin comes back out warm: lift and redden the shadows
         float lum = dot(outgoingLight, vec3(0.299, 0.587, 0.114));
         float shade = (1.0 - smoothstep(0.06, 0.42, lum)) * (1.0 - vCavity);
         outgoingLight = mix(outgoingLight, outgoingLight * vec3(1.18, 0.84, 0.74) + vec3(0.03, 0.006, 0.0), shade * 0.85);
         #include <opaque_fragment>
-      `);
+      `,
+        );
     },
   });
 }
 
 function mouthMaterial(uniforms) {
-  const material = new THREE.MeshStandardMaterial({ color: '#a99d8a', roughness: .45, metalness: 0 });
-  return patch(material, uniforms, 'mh-mouth-v2', {
-    vertexHeader: 'attribute vec4 skinTag; varying float vTongue; varying float vEye;',
-    fragmentHeader: 'varying float vTongue; varying float vEye; uniform vec2 uLook; uniform float uExpr; uniform float uRollBack;' + tornGLSL,
+  const material = new THREE.MeshStandardMaterial({
+    color: "#a99d8a",
+    roughness: 0.45,
+    metalness: 0,
+  });
+  return patch(material, uniforms, "mh-mouth-v2", {
+    vertexHeader:
+      "attribute vec4 skinTag; varying float vTongue; varying float vEye;",
+    fragmentHeader:
+      "varying float vTongue; varying float vEye; uniform vec2 uLook; uniform float uExpr; uniform float uRollBack;" +
+      tornGLSL,
     color: `
       // whatever sat under the torn-off skin (eyes, teeth) goes with it
       if (uTornSide != 0.0 && tornRegion(vSkinRest) > -0.002) discard;
@@ -453,9 +537,15 @@ function mouthMaterial(uniforms) {
         diffuseColor.rgb = col;
       }
       { vec3 tone = diffuseColor.rgb; ${dustTintGLSL} diffuseColor.rgb = tone; }`,
-    extra: shader => {
-      shader.vertexShader = shader.vertexShader.replace('vSkinRest = position;', 'vSkinRest = position; vTongue = skinTag.x; vEye = skinTag.z;');
-      shader.fragmentShader = shader.fragmentShader.replace('#include <roughnessmap_fragment>', '#include <roughnessmap_fragment>\n roughnessFactor = mix(roughnessFactor, 0.08, vEye);');
+    extra: (shader) => {
+      shader.vertexShader = shader.vertexShader.replace(
+        "vSkinRest = position;",
+        "vSkinRest = position; vTongue = skinTag.x; vEye = skinTag.z;",
+      );
+      shader.fragmentShader = shader.fragmentShader.replace(
+        "#include <roughnessmap_fragment>",
+        "#include <roughnessmap_fragment>\n roughnessFactor = mix(roughnessFactor, 0.08, vEye);",
+      );
     },
   });
 }
@@ -463,32 +553,63 @@ function mouthMaterial(uniforms) {
 // The dust itself: flakes scattered over the skin, each one let go when its spot
 // of skin crumbles, then carried off by a soft wind.
 function makeDust(geometry, uniforms, count = 45000) {
-  const P = geometry.attributes.position, N = geometry.attributes.normal, I = geometry.index.array;
-  const tris = I.length / 3, cum = new Float32Array(tris), a = new THREE.Vector3(), b = new THREE.Vector3(), c = new THREE.Vector3();
+  const P = geometry.attributes.position,
+    N = geometry.attributes.normal,
+    I = geometry.index.array;
+  const tris = I.length / 3,
+    cum = new Float32Array(tris),
+    a = new THREE.Vector3(),
+    b = new THREE.Vector3(),
+    c = new THREE.Vector3();
   let total = 0;
   for (let t = 0; t < tris; t++) {
-    a.fromBufferAttribute(P, I[t * 3]); b.fromBufferAttribute(P, I[t * 3 + 1]); c.fromBufferAttribute(P, I[t * 3 + 2]);
-    total += b.sub(a).cross(c.sub(a)).length() / 2; cum[t] = total;
+    a.fromBufferAttribute(P, I[t * 3]);
+    b.fromBufferAttribute(P, I[t * 3 + 1]);
+    c.fromBufferAttribute(P, I[t * 3 + 2]);
+    total += b.sub(a).cross(c.sub(a)).length() / 2;
+    cum[t] = total;
   }
-  const pos = new Float32Array(count * 3), nor = new Float32Array(count * 3), seed = new Float32Array(count);
+  const pos = new Float32Array(count * 3),
+    nor = new Float32Array(count * 3),
+    seed = new Float32Array(count);
   for (let i = 0; i < count; i++) {
-    const r = Math.random() * total; let lo = 0, hi = tris - 1;
-    while (lo < hi) { const m = (lo + hi) >> 1; if (cum[m] < r) lo = m + 1; else hi = m; }
-    let u = Math.random(), v = Math.random(); if (u + v > 1) { u = 1 - u; v = 1 - v; }
+    const r = Math.random() * total;
+    let lo = 0,
+      hi = tris - 1;
+    while (lo < hi) {
+      const m = (lo + hi) >> 1;
+      if (cum[m] < r) lo = m + 1;
+      else hi = m;
+    }
+    let u = Math.random(),
+      v = Math.random();
+    if (u + v > 1) {
+      u = 1 - u;
+      v = 1 - v;
+    }
     for (let k = 0; k < 3; k++) {
-      const i0 = I[lo * 3] * 3 + k, i1 = I[lo * 3 + 1] * 3 + k, i2 = I[lo * 3 + 2] * 3 + k;
-      pos[i * 3 + k] = P.array[i0] * (1 - u - v) + P.array[i1] * u + P.array[i2] * v;
-      nor[i * 3 + k] = N.array[i0] * (1 - u - v) + N.array[i1] * u + N.array[i2] * v;
+      const i0 = I[lo * 3] * 3 + k,
+        i1 = I[lo * 3 + 1] * 3 + k,
+        i2 = I[lo * 3 + 2] * 3 + k;
+      pos[i * 3 + k] =
+        P.array[i0] * (1 - u - v) + P.array[i1] * u + P.array[i2] * v;
+      nor[i * 3 + k] =
+        N.array[i0] * (1 - u - v) + N.array[i1] * u + N.array[i2] * v;
     }
     seed[i] = Math.random();
   }
   const g = new THREE.BufferGeometry();
-  g.setAttribute('position', new THREE.BufferAttribute(pos, 3));
-  g.setAttribute('aNormal', new THREE.BufferAttribute(nor, 3));
-  g.setAttribute('aSeed', new THREE.BufferAttribute(seed, 1));
+  g.setAttribute("position", new THREE.BufferAttribute(pos, 3));
+  g.setAttribute("aNormal", new THREE.BufferAttribute(nor, 3));
+  g.setAttribute("aSeed", new THREE.BufferAttribute(seed, 1));
   const material = new THREE.ShaderMaterial({
-    uniforms: { uPeel: uniforms.uPeel, uTornSide: uniforms.uTornSide, uScale: { value: 800 } },
-    transparent: true, depthWrite: false,
+    uniforms: {
+      uPeel: uniforms.uPeel,
+      uTornSide: uniforms.uTornSide,
+      uScale: { value: 800 },
+    },
+    transparent: true,
+    depthWrite: false,
     vertexShader: `
       attribute vec3 aNormal; attribute float aSeed;
       uniform float uPeel; uniform float uScale;
@@ -523,7 +644,9 @@ function makeDust(geometry, uniforms, count = 45000) {
       }`,
   });
   const points = new THREE.Points(g, material);
-  points.frustumCulled = false; points.visible = false; points.renderOrder = 5;
+  points.frustumCulled = false;
+  points.visible = false;
+  points.renderOrder = 5;
   return points;
 }
 
@@ -531,23 +654,47 @@ function makeDust(geometry, uniforms, count = 45000) {
 // vertex colours (which carry tags, not colours) to their own attribute.
 function bakeMesh(source) {
   source.updateWorldMatrix(true, false);
-  const m = source.matrixWorld, linear = new THREE.Matrix3().setFromMatrix4(m), nm = new THREE.Matrix3().getNormalMatrix(m);
-  const src = source.geometry, g = new THREE.BufferGeometry(), v = new THREE.Vector3();
+  const m = source.matrixWorld,
+    linear = new THREE.Matrix3().setFromMatrix4(m),
+    nm = new THREE.Matrix3().getNormalMatrix(m);
+  const src = source.geometry,
+    g = new THREE.BufferGeometry(),
+    v = new THREE.Vector3();
   const copy = (attr, fn) => {
     const out = new Float32Array(attr.count * 3);
-    for (let i = 0; i < attr.count; i++) fn(v.fromBufferAttribute(attr, i)).toArray(out, i * 3);
+    for (let i = 0; i < attr.count; i++)
+      fn(v.fromBufferAttribute(attr, i)).toArray(out, i * 3);
     return new THREE.BufferAttribute(out, 3);
   };
-  g.setAttribute('position', copy(src.attributes.position, p => p.applyMatrix4(m)));
-  g.setAttribute('normal', copy(src.attributes.normal, n => n.applyMatrix3(nm).normalize()));
-  const c = src.attributes.color, tag = new Float32Array(c.count * 4);
-  for (let i = 0; i < c.count; i++) { tag[i * 4] = c.getX(i); tag[i * 4 + 1] = c.getY(i); tag[i * 4 + 2] = c.getZ(i); tag[i * 4 + 3] = 1; }
-  g.setAttribute('skinTag', new THREE.BufferAttribute(tag, 4));
+  g.setAttribute(
+    "position",
+    copy(src.attributes.position, (p) => p.applyMatrix4(m)),
+  );
+  g.setAttribute(
+    "normal",
+    copy(src.attributes.normal, (n) => n.applyMatrix3(nm).normalize()),
+  );
+  const c = src.attributes.color,
+    tag = new Float32Array(c.count * 4);
+  for (let i = 0; i < c.count; i++) {
+    tag[i * 4] = c.getX(i);
+    tag[i * 4 + 1] = c.getY(i);
+    tag[i * 4 + 2] = c.getZ(i);
+    tag[i * 4 + 3] = 1;
+  }
+  g.setAttribute("skinTag", new THREE.BufferAttribute(tag, 4));
   g.setIndex(src.index.clone());
   if (src.morphAttributes.position) {
     g.morphTargetsRelative = src.morphTargetsRelative;
-    g.morphAttributes.position = src.morphAttributes.position.map(a => copy(a, p => src.morphTargetsRelative ? p.applyMatrix3(linear) : p.applyMatrix4(m)));
-    if (src.morphAttributes.normal) g.morphAttributes.normal = src.morphAttributes.normal.map(a => copy(a, n => n.applyMatrix3(nm)));
+    g.morphAttributes.position = src.morphAttributes.position.map((a) =>
+      copy(a, (p) =>
+        src.morphTargetsRelative ? p.applyMatrix3(linear) : p.applyMatrix4(m),
+      ),
+    );
+    if (src.morphAttributes.normal)
+      g.morphAttributes.normal = src.morphAttributes.normal.map((a) =>
+        copy(a, (n) => n.applyMatrix3(nm)),
+      );
   }
   g.computeBoundingSphere();
   const mesh = new THREE.Mesh(g);
@@ -559,11 +706,18 @@ function bakeMesh(source) {
 
 export function bakeSkin(scene) {
   scene.updateMatrixWorld(true);
-  let skin = null, mouth = null;
-  scene.traverse(o => { if (o.isMesh) { if (/mouth/i.test(o.name)) mouth = o; else skin = o; } });
-  if (!skin || !mouth) throw new Error('Expected the skin and mouth meshes.');
+  let skin = null,
+    mouth = null;
+  scene.traverse((o) => {
+    if (o.isMesh) {
+      if (/mouth/i.test(o.name)) mouth = o;
+      else skin = o;
+    }
+  });
+  if (!skin || !mouth) throw new Error("Expected the skin and mouth meshes.");
   const group = new THREE.Group();
-  group.userData.skin = bakeMesh(skin); group.userData.mouth = bakeMesh(mouth);
+  group.userData.skin = bakeMesh(skin);
+  group.userData.mouth = bakeMesh(mouth);
   group.add(group.userData.skin, group.userData.mouth);
   return group;
 }
@@ -571,77 +725,155 @@ export function bakeSkin(scene) {
 // Expression weights along the pull: wince, then grimace, then a full scream.
 function expressionWeights(p) {
   return {
-    wince: band(p, 0, .3) * (1 - band(p, .38, .62)),
-    grimace: band(p, .3, .58) * (1 - band(p, .68, .9)),
-    scream: band(p, .62, .95),
+    wince: band(p, 0, 0.3) * (1 - band(p, 0.38, 0.62)),
+    grimace: band(p, 0.3, 0.58) * (1 - band(p, 0.68, 0.9)),
+    scream: band(p, 0.62, 0.95),
   };
 }
 
 export class SkinPeel {
   constructor({ mesh, scene, camera, canvas, reducedMotion, onChange }) {
-    Object.assign(this, { mesh, scene, camera, canvas, reducedMotion, onChange });
-    this.skin = mesh.userData.skin; this.mouth = mesh.userData.mouth;
+    Object.assign(this, {
+      mesh,
+      scene,
+      camera,
+      canvas,
+      reducedMotion,
+      onChange,
+    });
+    this.skin = mesh.userData.skin;
+    this.mouth = mesh.userData.mouth;
     this.uniforms = {
-      uGrab: { value: new THREE.Vector3(0, 99, 0) }, uPull: { value: new THREE.Vector3() },
-      uPeel: { value: -1 }, uPeelSide: { value: 0 }, uExpr: { value: 0 }, uTension: { value: 0 }, uTime: { value: 0 },
-      uHeadRot: { value: new THREE.Vector3() }, uShake: { value: 0 }, uHeadPull: { value: new THREE.Vector3() },
-      uLook: { value: new THREE.Vector2() }, uRollBack: { value: 0 },
-      uTornSide: { value: 0 }, uTornKeep: { value: 0 }, uTornTime: { value: 0 }, uPieceFade: { value: 0 }, uWiden: { value: 0 },
+      uGrab: { value: new THREE.Vector3(0, 99, 0) },
+      uPull: { value: new THREE.Vector3() },
+      uPeel: { value: -1 },
+      uPeelSide: { value: 0 },
+      uExpr: { value: 0 },
+      uTension: { value: 0 },
+      uTime: { value: 0 },
+      uHeadRot: { value: new THREE.Vector3() },
+      uShake: { value: 0 },
+      uHeadPull: { value: new THREE.Vector3() },
+      uLook: { value: new THREE.Vector2() },
+      uRollBack: { value: 0 },
+      uTornSide: { value: 0 },
+      uTornKeep: { value: 0 },
+      uTornTime: { value: 0 },
+      uPieceFade: { value: 0 },
+      uWiden: { value: 0 },
     };
     // the piece that tears off: same skin, frozen in its stretched pose, then it drops
     const u0 = this.uniforms;
-    this.pieceUniforms = { ...u0,
-      uPeel: { value: -1 }, uPull: { value: new THREE.Vector3() }, uHeadPull: { value: new THREE.Vector3() },
-      uHeadRot: { value: new THREE.Vector3() }, uShake: { value: 0 }, uTornKeep: { value: 1 }, uPieceFade: { value: 0 }, uWiden: { value: 0 } };
-    this.piece = new THREE.Mesh(this.skin.geometry, skinMaterial(this.pieceUniforms, 'mh-skin-piece-v2'));
+    this.pieceUniforms = {
+      ...u0,
+      uPeel: { value: -1 },
+      uPull: { value: new THREE.Vector3() },
+      uHeadPull: { value: new THREE.Vector3() },
+      uHeadRot: { value: new THREE.Vector3() },
+      uShake: { value: 0 },
+      uTornKeep: { value: 1 },
+      uPieceFade: { value: 0 },
+      uWiden: { value: 0 },
+    };
+    this.piece = new THREE.Mesh(
+      this.skin.geometry,
+      skinMaterial(this.pieceUniforms, "mh-skin-piece-v2"),
+    );
     this.piece.morphTargetDictionary = this.skin.morphTargetDictionary;
     this.piece.morphTargetInfluences = [...this.skin.morphTargetInfluences];
     this.piece.frustumCulled = false;
-    this.pivot = new THREE.Group(); this.pivot.add(this.piece); this.pivot.visible = false;
+    this.pivot = new THREE.Group();
+    this.pivot.add(this.piece);
+    this.pivot.visible = false;
     scene.add(this.pivot);
-    this.tearT = -1; this.peelDelay = 0; this.pieceDir = new THREE.Vector3(); this.pieceAxis = new THREE.Vector3(1, 0, 0);
+    this.tearT = -1;
+    this.peelDelay = 0;
+    this.pieceDir = new THREE.Vector3();
+    this.pieceAxis = new THREE.Vector3(1, 0, 0);
     this.skin.material = skinMaterial(this.uniforms);
     // layers that give the torn edge its thickness, on the body and on the piece
     this.shells = [];
-    for (const [owner, uni] of [[this.skin, this.uniforms], [this.piece, this.pieceUniforms]]) {
+    for (const [owner, uni] of [
+      [this.skin, this.uniforms],
+      [this.piece, this.pieceUniforms],
+    ]) {
       for (let k = 1; k <= SKIN_SHELLS; k++) {
-        const shell = new THREE.Mesh(this.skin.geometry, skinMaterial({ ...uni, uShell: { value: k / SKIN_SHELLS } }, 'mh-skin-shell-v2', true));
+        const shell = new THREE.Mesh(
+          this.skin.geometry,
+          skinMaterial(
+            { ...uni, uShell: { value: k / SKIN_SHELLS } },
+            "mh-skin-shell-v2",
+            true,
+          ),
+        );
         shell.morphTargetDictionary = owner.morphTargetDictionary;
-        shell.morphTargetInfluences = owner.morphTargetInfluences;   // same array: always in the same pose
-        shell.frustumCulled = false; shell.visible = false; shell.raycast = () => {};
-        owner.add(shell); this.shells.push(shell);
+        shell.morphTargetInfluences = owner.morphTargetInfluences; // same array: always in the same pose
+        shell.frustumCulled = false;
+        shell.visible = false;
+        shell.raycast = () => {};
+        owner.add(shell);
+        this.shells.push(shell);
       }
     }
     this.mouth.material = mouthMaterial(this.uniforms);
-    this.dust = makeDust(this.skin.geometry, this.uniforms); scene.add(this.dust);
-    this.ray = new THREE.Raycaster(); this.pointer = new THREE.Vector2();
+    this.dust = makeDust(this.skin.geometry, this.uniforms);
+    scene.add(this.dust);
+    this.ray = new THREE.Raycaster();
+    this.pointer = new THREE.Vector2();
     this.pullTarget = new THREE.Vector3();
-    this.drag = null; this.cloth = null; this.revealed = false; this.side = 0; this.snapT = -1;
-    this.phase = 'covered'; this.progress = 0; this.shown = 0; this.elapsed = 0;
+    this.drag = null;
+    this.cloth = null;
+    this.revealed = false;
+    this.side = 0;
+    this.snapT = -1;
+    this.phase = "covered";
+    this.progress = 0;
+    this.shown = 0;
+    this.elapsed = 0;
   }
-  get canExplore() { return this.revealed && !this.drag; }
-  get peeling() { return this.tearT >= 0 && !this.revealed; }
-  notify() { this.onChange(this.phase, this.canExplore); }
+  get canExplore() {
+    return this.revealed && !this.drag;
+  }
+  get peeling() {
+    return this.tearT >= 0 && !this.revealed;
+  }
+  notify() {
+    this.onChange(this.phase, this.canExplore);
+  }
   hit(event) {
     const box = this.canvas.getBoundingClientRect();
-    this.pointer.set((event.clientX - box.left) / box.width * 2 - 1, 1 - (event.clientY - box.top) / box.height * 2);
+    this.pointer.set(
+      ((event.clientX - box.left) / box.width) * 2 - 1,
+      1 - ((event.clientY - box.top) / box.height) * 2,
+    );
     this.ray.setFromCamera(this.pointer, this.camera);
     return this.ray.intersectObject(this.skin, false)[0];
   }
   // Only the face can be grabbed.
-  isFace(point) { return point.y > FACE.chinY - .005 && point.y < FACE.topY - .03 && point.z > .03 && Math.abs(point.x) < .08; }
+  isFace(point) {
+    return (
+      point.y > FACE.chinY - 0.005 &&
+      point.y < FACE.topY - 0.03 &&
+      point.z > 0.03 &&
+      Math.abs(point.x) < 0.08
+    );
+  }
   begin(event) {
     if (this.revealed || this.peeling || this.drag) return false;
     const hit = this.hit(event);
     if (!hit || !this.isFace(hit.point)) return false;
     this.drag = { id: event.pointerId, x: event.clientX, y: event.clientY };
-    this.side = 0; this.progress = 0;
-    this.phase = 'pulling'; this.notify(); return true;
+    this.side = 0;
+    this.progress = 0;
+    this.phase = "pulling";
+    this.notify();
+    return true;
   }
   move(event) {
     if (!this.drag || this.drag.id !== event.pointerId) return;
     const box = this.canvas.getBoundingClientRect();
-    const dx = event.clientX - this.drag.x, dy = event.clientY - this.drag.y;
+    const dx = event.clientX - this.drag.x,
+      dy = event.clientY - this.drag.y;
     // the first clear movement decides: sideways pulls a cheek, downward pulls the forehead
     if (!this.side && Math.hypot(dx, dy) > 14) {
       if (dy > Math.abs(dx)) this.side = 2;
@@ -650,121 +882,241 @@ export class SkinPeel {
       if (this.side) this.uniforms.uGrab.value.copy(GRAB.point(this.side));
     }
     if (!this.side) return;
-    const threshold = clamp(box.width * .28, 190, 360);
-    const along = this.side === 2 ? dy : this.side === 3 ? -dy : dx * this.side, across = this.side >= 2 ? dx : dy;
-    this.progress = clamp(Math.max(0, along + Math.abs(across) * .35) / threshold, 0, 1);
+    const threshold = clamp(box.width * 0.28, 190, 360);
+    const along = this.side === 2 ? dy : this.side === 3 ? -dy : dx * this.side,
+      across = this.side >= 2 ? dx : dy;
+    this.progress = clamp(
+      Math.max(0, along + Math.abs(across) * 0.35) / threshold,
+      0,
+      1,
+    );
     if (this.progress >= 1) this.tear();
   }
   end(event) {
     if (!this.drag || (event && event.pointerId !== this.drag.id)) return;
-    this.drag = null; this.progress = 0;
-    this.phase = 'recoiling'; this.notify();
+    this.drag = null;
+    this.progress = 0;
+    this.phase = "recoiling";
+    this.notify();
   }
   tear() {
-    const u = this.uniforms, pu = this.pieceUniforms, side = this.side;
-    this.drag = null; this.progress = 1;
-    u.uPeelSide.value = side; u.uTornSide.value = side; u.uTornTime.value = 0;
+    const u = this.uniforms,
+      pu = this.pieceUniforms,
+      side = this.side;
+    this.drag = null;
+    this.progress = 1;
+    u.uPeelSide.value = side;
+    u.uTornSide.value = side;
+    u.uTornTime.value = 0;
     // freeze the piece in the pose it was torn from
-    pu.uPull.value.copy(u.uPull.value); pu.uHeadPull.value.copy(u.uHeadPull.value); pu.uHeadRot.value.copy(u.uHeadRot.value);
+    pu.uPull.value.copy(u.uPull.value);
+    pu.uHeadPull.value.copy(u.uHeadPull.value);
+    pu.uHeadRot.value.copy(u.uHeadRot.value);
     pu.uPieceFade.value = 0;
-    this.piece.morphTargetInfluences.splice(0, Infinity, ...this.skin.morphTargetInfluences);
+    this.piece.morphTargetInfluences.splice(
+      0,
+      Infinity,
+      ...this.skin.morphTargetInfluences,
+    );
     const c = GRAB.point(side).add(u.uPull.value);
-    this.pivot.position.copy(c); this.piece.position.copy(c).negate();
-    this.pivot.rotation.set(0, 0, 0); this.pivot.visible = true; this.pieceT = 0;
+    this.pivot.position.copy(c);
+    this.piece.position.copy(c).negate();
+    this.pivot.rotation.set(0, 0, 0);
+    this.pivot.visible = true;
+    this.pieceT = 0;
     this.pieceDir.copy(GRAB.dir(side));
-    this.pieceAxis.crossVectors(this.pieceDir, new THREE.Vector3(0, 0, 1)).normalize();
-    if (this.pieceAxis.lengthSq() < .01) this.pieceAxis.set(1, 0, 0);
+    this.pieceAxis
+      .crossVectors(this.pieceDir, new THREE.Vector3(0, 0, 1))
+      .normalize();
+    if (this.pieceAxis.lengthSq() < 0.01) this.pieceAxis.set(1, 0, 0);
     for (const shell of this.shells) shell.visible = true;
     this.snapT = 0; // the head springs back into place
-    this.tearT = 0; this.peelDelay = side === 3 ? 1.0 : .35;
-    this.phase = 'revealing'; this.notify();
+    this.tearT = 0;
+    this.peelDelay = side === 3 ? 1.0 : 0.35;
+    this.phase = "revealing";
+    this.notify();
   }
   skip() {
-    this.drag = null; this.side = 0; this.uniforms.uPeelSide.value = 0; this.uniforms.uTornSide.value = 0;
-    this.tearT = 0; this.peelDelay = 0; this.phase = 'revealing'; this.notify();
+    this.drag = null;
+    this.side = 0;
+    this.uniforms.uPeelSide.value = 0;
+    this.uniforms.uTornSide.value = 0;
+    this.tearT = 0;
+    this.peelDelay = 0;
+    this.phase = "revealing";
+    this.notify();
   }
   reset() {
-    this.drag = null; this.revealed = false; this.phase = 'covered'; this.progress = 0; this.shown = 0; this.side = 0; this.snapT = -1; this.tearT = -1;
+    this.drag = null;
+    this.revealed = false;
+    this.phase = "covered";
+    this.progress = 0;
+    this.shown = 0;
+    this.side = 0;
+    this.snapT = -1;
+    this.tearT = -1;
     const u = this.uniforms;
-    u.uPull.value.set(0, 0, 0); u.uPeel.value = -1; u.uPeelSide.value = 0;
-    u.uExpr.value = 0; u.uTension.value = 0; u.uGrab.value.set(0, 99, 0); u.uRollBack.value = 0;
-    u.uHeadPull.value.set(0, 0, 0); u.uHeadRot.value.set(0, 0, 0); u.uShake.value = 0;
-    u.uTornSide.value = 0; u.uTornTime.value = 0; u.uWiden.value = 0; this.pivot.visible = false;
+    u.uPull.value.set(0, 0, 0);
+    u.uPeel.value = -1;
+    u.uPeelSide.value = 0;
+    u.uExpr.value = 0;
+    u.uTension.value = 0;
+    u.uGrab.value.set(0, 99, 0);
+    u.uRollBack.value = 0;
+    u.uHeadPull.value.set(0, 0, 0);
+    u.uHeadRot.value.set(0, 0, 0);
+    u.uShake.value = 0;
+    u.uTornSide.value = 0;
+    u.uTornTime.value = 0;
+    u.uWiden.value = 0;
+    this.pivot.visible = false;
     for (const shell of this.shells) shell.visible = false;
     this.dust.visible = false;
     this.applyExpression(0);
-    this.mesh.visible = true; this.notify();
+    this.mesh.visible = true;
+    this.notify();
   }
   frontAt(x, z) {
-    if (isDust(this.uniforms.uPeelSide.value)) return this.uniforms.uPeel.value > .5 ? -99 : 99; return peelFrontJS(Math.atan2(x, z), this.uniforms.uPeel.value, this.uniforms.uPeelSide.value); }
+    if (isDust(this.uniforms.uPeelSide.value))
+      return this.uniforms.uPeel.value > 0.5 ? -99 : 99;
+    return peelFrontJS(
+      Math.atan2(x, z),
+      this.uniforms.uPeel.value,
+      this.uniforms.uPeelSide.value,
+    );
+  }
   applyExpression(p) {
     const w = expressionWeights(p);
     for (const mesh of [this.skin, this.mouth]) {
-      const dict = mesh.morphTargetDictionary, inf = mesh.morphTargetInfluences;
-      for (const name in w) if (dict[name] !== undefined) inf[dict[name]] = w[name];
+      const dict = mesh.morphTargetDictionary,
+        inf = mesh.morphTargetInfluences;
+      for (const name in w)
+        if (dict[name] !== undefined) inf[dict[name]] = w[name];
     }
   }
   update(dt) {
-    this.elapsed += dt; let active = false;
+    this.elapsed += dt;
+    let active = false;
     const u = this.uniforms;
     u.uTime.value = this.elapsed;
     // the shown pull eases toward the real one, so the animation never jumps
-    const target = this.phase === 'pulling' || this.peeling ? this.progress : 0;
+    const target = this.phase === "pulling" || this.peeling ? this.progress : 0;
     const before = this.shown;
-    this.shown += (target - this.shown) * (1 - Math.exp(-dt * (target > this.shown ? 12 : 6)));
-    if (Math.abs(this.shown - target) < .0005) this.shown = target;
+    this.shown +=
+      (target - this.shown) *
+      (1 - Math.exp(-dt * (target > this.shown ? 12 : 6)));
+    if (Math.abs(this.shown - target) < 0.0005) this.shown = target;
     const p = this.shown;
-    if (p !== before || this.phase === 'pulling') active = true;
+    if (p !== before || this.phase === "pulling") active = true;
     // after the rip the head springs back to its rest pose with a small wobble
     let pose = 1;
     if (this.snapT >= 0) {
       this.snapT += dt;
-      pose = this.snapT > .7 ? 0 : Math.exp(-this.snapT * 12) * Math.cos(this.snapT * 2 * Math.PI / .3);
+      pose =
+        this.snapT > 0.7
+          ? 0
+          : Math.exp(-this.snapT * 12) *
+            Math.cos((this.snapT * 2 * Math.PI) / 0.3);
     }
-    const side = this.side, down = side === 2, up = side === 3, vert = down || up, e = smooth(p * 1.15);
+    const side = this.side,
+      down = side === 2,
+      up = side === 3,
+      vert = down || up,
+      e = smooth(p * 1.15);
     // fixed, designed path for the grabbed point
     if (side) {
       const reach = GRAB.reach(side) * (1 - Math.pow(1 - p, 2.2));
       u.uPull.value.copy(GRAB.dir(side)).multiplyScalar(reach * pose);
-      u.uHeadPull.value.copy(GRAB.dir(side)).multiplyScalar((down ? .04 : up ? .05 : .045) * smooth(p) * pose);
-    } else { u.uPull.value.set(0, 0, 0); u.uHeadPull.value.set(0, 0, 0); }
+      u.uHeadPull.value
+        .copy(GRAB.dir(side))
+        .multiplyScalar((down ? 0.04 : up ? 0.05 : 0.045) * smooth(p) * pose);
+    } else {
+      u.uPull.value.set(0, 0, 0);
+      u.uHeadPull.value.set(0, 0, 0);
+    }
     u.uTension.value = p;
     u.uExpr.value = e;
     // pulled sideways the head turns and rolls with the pull; pulled down it bows forward
-    u.uHeadRot.value.set((down ? .24 : up ? -.26 : -.06) * e * pose, (side && !vert ? side * .11 : 0) * e * pose, (side && !vert ? -side * .07 : 0) * e * pose);
+    u.uHeadRot.value.set(
+      (down ? 0.24 : up ? -0.26 : -0.06) * e * pose,
+      (side && !vert ? side * 0.11 : 0) * e * pose,
+      (side && !vert ? -side * 0.07 : 0) * e * pose,
+    );
     u.uShake.value = e * e * Math.max(pose, this.snapT >= 0 ? 0 : 1);
     // eyes dart toward the hand with panicked jumps, then roll back right before the break
-    const jitter = p > .15 ? Math.sin(this.elapsed * 13.0) * Math.sin(this.elapsed * 7.3) * .12 * p : 0;
-    const lookX = vert ? 0 : (side ? side * .38 : 0), lookY = down ? .1 : up ? -.22 : .06;
-    u.uLook.value.set(lookX * smooth(p * 2) + jitter, lookY * smooth(p * 2) + jitter * .5);
-    u.uRollBack.value = band(p, .8, .97);
-    if (this.snapT >= 0 && this.snapT < .7) active = true;
+    const jitter =
+      p > 0.15
+        ? Math.sin(this.elapsed * 13.0) *
+          Math.sin(this.elapsed * 7.3) *
+          0.12 *
+          p
+        : 0;
+    const lookX = vert ? 0 : side ? side * 0.38 : 0,
+      lookY = down ? 0.1 : up ? -0.22 : 0.06;
+    u.uLook.value.set(
+      lookX * smooth(p * 2) + jitter,
+      lookY * smooth(p * 2) + jitter * 0.5,
+    );
+    u.uRollBack.value = band(p, 0.8, 0.97);
+    if (this.snapT >= 0 && this.snapT < 0.7) active = true;
     this.applyExpression(p);
-    if (this.phase === 'recoiling' && p < .002) {
-      this.shown = 0; u.uPull.value.set(0, 0, 0); u.uExpr.value = 0; this.side = 0; this.applyExpression(0); u.uRollBack.value = 0;
-      this.phase = 'covered'; this.notify();
+    if (this.phase === "recoiling" && p < 0.002) {
+      this.shown = 0;
+      u.uPull.value.set(0, 0, 0);
+      u.uExpr.value = 0;
+      this.side = 0;
+      this.applyExpression(0);
+      u.uRollBack.value = 0;
+      this.phase = "covered";
+      this.notify();
     }
     if (this.pivot.visible) {
       // the torn piece drops, tumbling, and breaks apart as it falls
-      const t = this.pieceT += dt, pu = this.pieceUniforms;
-      const offset = this.pieceDir.clone().multiplyScalar(.12 * (1 - Math.exp(-t * 6)));
-      if (this.side === 3) { offset.y += 1.5 * t - 2.6 * t * t; offset.z -= .55 * t; }   // yanked up and over, behind the head
-      else { offset.y -= 2.6 * t * t; offset.z += .25 * t; }
-      this.pivot.position.copy(GRAB.point(this.side || 1)).add(pu.uPull.value).add(offset);
-      this.pivot.setRotationFromAxisAngle(this.pieceAxis, (this.side === 3 ? 3.4 : -2.4) * t);
-      pu.uPieceFade.value = smooth((t - .45) / 1.0);
+      const t = (this.pieceT += dt),
+        pu = this.pieceUniforms;
+      const offset = this.pieceDir
+        .clone()
+        .multiplyScalar(0.12 * (1 - Math.exp(-t * 6)));
+      if (this.side === 3) {
+        offset.y += 1.5 * t - 2.6 * t * t;
+        offset.z -= 0.55 * t;
+      } // yanked up and over, behind the head
+      else {
+        offset.y -= 2.6 * t * t;
+        offset.z += 0.25 * t;
+      }
+      this.pivot.position
+        .copy(GRAB.point(this.side || 1))
+        .add(pu.uPull.value)
+        .add(offset);
+      this.pivot.setRotationFromAxisAngle(
+        this.pieceAxis,
+        (this.side === 3 ? 3.4 : -2.4) * t,
+      );
+      pu.uPieceFade.value = smooth((t - 0.45) / 1.0);
       if (t > 1.6) this.pivot.visible = false;
       active = true;
     }
     if (this.peeling) {
-      this.tearT += dt; u.uTornTime.value = this.tearT;
-      if (u.uTornSide.value === 3) u.uWiden.value = smooth(this.tearT / .3);
-      if (this.tearT >= this.peelDelay) u.uPeel.value = Math.max(u.uPeel.value, 0) + (this.reducedMotion ? dt * 4 : dt);
+      this.tearT += dt;
+      u.uTornTime.value = this.tearT;
+      if (u.uTornSide.value === 3) u.uWiden.value = smooth(this.tearT / 0.3);
+      if (this.tearT >= this.peelDelay)
+        u.uPeel.value =
+          Math.max(u.uPeel.value, 0) + (this.reducedMotion ? dt * 4 : dt);
       this.dust.visible = isDust(u.uPeelSide.value) && u.uPeel.value >= 0;
-      if (this.dust.visible) this.dust.material.uniforms.uScale.value = this.canvas.height / (2 * Math.tan(this.camera.fov * Math.PI / 360));
+      if (this.dust.visible)
+        this.dust.material.uniforms.uScale.value =
+          this.canvas.height /
+          (2 * Math.tan((this.camera.fov * Math.PI) / 360));
       active = true;
       if (u.uPeel.value >= PEEL_DONE) {
-        this.mesh.visible = false; this.pivot.visible = false; this.dust.visible = false; this.revealed = true; this.phase = 'explore'; this.notify();
+        this.mesh.visible = false;
+        this.pivot.visible = false;
+        this.dust.visible = false;
+        this.revealed = true;
+        this.phase = "explore";
+        this.notify();
       }
     }
     return active;
