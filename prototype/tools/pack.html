@@ -1,0 +1,46 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Mocap To Clip</title>
+  <script type="importmap">{"imports":{"three":"../../vendor/three.module.js","three/addons/":"../../vendor/"}}</script>
+  <style>
+    body{margin:0;min-height:100vh;background:#3e3c3a;color:#f2eee8;font:13px/1.6 ui-monospace,Consolas,monospace;display:grid;place-items:center}
+    main{width:min(560px,92vw);background:rgba(30,28,27,.9);padding:28px;border-radius:3px}
+    h1{margin:0 0 4px;font:400 26px Georgia,serif;letter-spacing:-.03em} p{color:#b9b3ab;margin:0 0 18px}
+    label{display:grid;grid-template-columns:150px 1fr;gap:10px;align-items:center;margin:9px 0;color:#b9b3ab}
+    input,select{font:inherit;color:#f2eee8;background:rgba(0,0,0,.3);border:1px solid rgba(255,255,255,.15);border-radius:2px;padding:6px 8px}
+    button{margin-top:16px;font:inherit;color:#f2eee8;background:none;border:0;border-bottom:2px solid #e0603f;padding:7px 0;cursor:pointer}
+    #out{margin-top:16px;white-space:pre-wrap;color:#d8d2ca}
+  </style>
+</head>
+<body>
+<main>
+  <h1>Mocap to clip</h1>
+  <p>Turns one animation from the workout pack (the <code>Unity</code> folder) into a clip.</p>
+  <label>Animation (.fbx)<input id="file" type="file" accept=".fbx"></label>
+  <label>Clip name<input id="name" type="text" value="dbsquat"></label>
+  <label>Equipment<select id="eq"><option value="dumbbells">dumbbells</option><option value="barbell">barbell (hands put on one straight bar)</option><option value="">none (bodyweight)</option></select></label>
+  <label>Feet<select id="plant"><option value="feet">stay where they stand (standing exercises)</option><option value="floor">on the floor, body lying (bench)</option><option value="">move freely (hanging, jumping)</option></select></label>
+  <button id="go" type="button">Make clip</button>
+  <div id="out">Loading rig…</div>
+</main>
+<script type="module">
+  import { FBXLoader } from 'three/addons/loaders/FBXLoader.js';
+  import { Rig } from '../rig.js';
+  import { fbxToClip } from './fbx-to-clip.js';
+  const $ = (id) => document.getElementById(id);
+  const [data, bin] = await Promise.all([fetch('../rig.json').then((r) => r.json()), fetch('../rig.bin').then((r) => r.arrayBuffer())]);
+  const rig = new Rig(data, bin); $('out').textContent = 'Ready. Pick an animation.';
+  $('go').onclick = async () => {
+    const f = $('file').files[0]; if (!f) return ($('out').textContent = 'Pick an .fbx first.');
+    const fbx = new FBXLoader().parse(await f.arrayBuffer(), '');
+    const clip = fbxToClip(fbx, rig, { name: $('name').value.trim(), equipment: $('eq').value || null, plant: $('plant').value || null });
+    const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([JSON.stringify(clip)], { type: 'application/json' }));
+    a.download = clip.name + '.json'; a.click();
+    $('out').textContent = `Made ${clip.name}.json: ${clip.frames} frames (${(clip.frames / clip.fps).toFixed(1)} s), ${clip.lifting.filter(Boolean).length} lifting.\nPut it in prototype/clips/ and add a line to exercises.js, with the muscles from free-exercise-db:\n  ${clip.name}: { title: '...', clip: 'clips/${clip.name}.json', equipment: ${$('eq').value ? "'" + $('eq').value + "'" : 'null'}, primary: [...], secondary: [...] },`;
+  };
+</script>
+</body>
+</html>

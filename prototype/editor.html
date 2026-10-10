@@ -1,0 +1,116 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Pose Editor</title>
+  <script type="importmap">{"imports":{"three":"../vendor/three.module.js","three/addons/":"../vendor/"}}</script>
+  <style>
+    @font-face{font-family:Barlow Condensed;src:url('../fonts/BarlowCondensed-Bold.ttf') format('truetype');font-weight:700}
+    :root{--ink:#f2eee8;--muted:#b9b3ab;--line:#7d7974;--red:#e0603f;--blue:#5aa9ff;--panel:rgba(36,34,32,.78);--mono:ui-monospace,SFMono-Regular,Consolas,"Liberation Mono",monospace}
+    *{box-sizing:border-box}
+    html,body{margin:0;height:100%;overflow:hidden;background:#4a4846;color:var(--ink);font-family:var(--mono);font-size:12px}
+    body::before{content:"";position:fixed;inset:0;pointer-events:none;
+      background:radial-gradient(ellipse 30% 52% at 45% 45%,rgba(176,170,160,.8) 0%,rgba(130,126,119,.5) 38%,rgba(74,72,70,0) 72%)}
+    #c{position:fixed;left:0;top:0;width:100%;height:calc(100% - 132px);display:block;outline:none;cursor:grab}
+    #c.over{cursor:pointer} #c.drag{cursor:grabbing}
+    button,select,input{font:inherit;color:var(--ink)}
+    button{cursor:pointer;background:none;border:0;border-bottom:1px solid var(--line);padding:7px 0 8px;letter-spacing:.02em}
+    button:hover{border-color:var(--red)} button.on{border-bottom:2px solid var(--red)} button:disabled{opacity:.35;cursor:default}
+    select,input[type=text],input[type=number]{background:rgba(0,0,0,.25);border:1px solid rgba(255,255,255,.15);border-radius:2px;padding:5px 7px}
+    .top{position:fixed;top:0;left:0;right:0;padding:20px clamp(18px,2.6vw,40px);display:flex;align-items:center;gap:22px;pointer-events:none}
+    .top > *{pointer-events:auto}
+    h1{margin:0 8px 0 0;font:400 26px/1 Georgia,serif;letter-spacing:-.04em}
+    .top .grow{flex:1}
+    .top a{color:var(--muted);font-size:11px}
+    #name{width:150px}
+    .panel{position:fixed;right:clamp(18px,2.6vw,40px);top:76px;width:270px;background:var(--panel);backdrop-filter:blur(6px);padding:16px;border-radius:2px}
+    .panel h2{margin:0 0 4px;font:400 19px/1.1 Georgia,serif;letter-spacing:-.03em}
+    .panel small{display:block;color:var(--muted);font-size:10px;letter-spacing:.16em;text-transform:uppercase;margin:14px 0 7px}
+    .panel label{display:grid;grid-template-columns:86px 1fr 38px;align-items:center;gap:8px;margin:7px 0;color:var(--muted)}
+    .panel label select{grid-column:2/4}
+    .panel input[type=range]{width:100%;accent-color:var(--red)}
+    .panel .val{text-align:right;color:var(--ink);font-variant-numeric:tabular-nums}
+    .sides{display:flex;gap:16px}
+    #working{list-style:none;margin:0;padding:0}
+    #working li{display:flex;align-items:center;gap:10px;padding:4px 0;border-bottom:1px solid rgba(255,255,255,.07);text-transform:capitalize}
+    #working li i{width:34px;height:3px;background:linear-gradient(90deg,var(--red) calc(var(--w)*100%),rgba(255,255,255,.12) 0)}
+    #working .none{color:var(--muted);text-transform:none}
+    .help{position:fixed;left:clamp(18px,2.6vw,40px);top:76px;width:250px;color:var(--muted);line-height:1.6;font-size:11px}
+    .help b{color:var(--ink);font-weight:400}
+    .dot{display:inline-block;width:9px;height:9px;border-radius:50%;vertical-align:-1px;margin-right:4px}
+    .timeline{position:fixed;left:0;right:0;bottom:0;height:132px;background:rgba(30,28,27,.88);padding:12px clamp(18px,2.6vw,40px) 14px;display:grid;grid-template-rows:auto 1fr;gap:10px}
+    .tl-tools{display:flex;align-items:center;gap:18px;flex-wrap:wrap}
+    .tl-tools .grow{flex:1}
+    #time{font-variant-numeric:tabular-nums;color:var(--muted);min-width:110px}
+    #duration{width:62px}
+    .track{position:relative;border-top:1px solid rgba(255,255,255,.12);cursor:pointer;user-select:none}
+    .ticks{position:absolute;left:0;right:0;top:0;height:16px;color:var(--muted);font-size:10px}
+    .ticks span{position:absolute;top:2px;transform:translateX(-50%)}
+    #lift{position:absolute;top:22px;height:22px;background:rgba(224,96,63,.22);border-left:2px solid var(--red);border-right:2px solid var(--red)}
+    #lift::after{content:"LIFT";position:absolute;left:6px;top:4px;font-size:10px;letter-spacing:.14em;color:#f3a58f}
+    .key{position:absolute;top:27px;width:13px;height:13px;margin-left:-6.5px;transform:rotate(45deg);background:var(--ink);border:1px solid #222;cursor:pointer}
+    .key.sel{background:var(--red)}
+    #playhead{position:absolute;top:0;bottom:0;width:2px;margin-left:-1px;background:#fff;pointer-events:none}
+    #toast{position:fixed;left:50%;bottom:150px;transform:translateX(-50%);background:var(--panel);padding:10px 14px;border-radius:2px;max-width:640px;line-height:1.5;display:none}
+    #toast code{color:#ffd8cc}
+    #load{position:fixed;inset:0;display:flex;align-items:center;justify-content:center;background:#4a4846;color:var(--muted);letter-spacing:.14em;text-transform:uppercase;font-size:11px;z-index:9}
+    [hidden]{display:none!important}
+  </style>
+</head>
+<body>
+  <canvas id="c" tabindex="0"></canvas>
+
+  <div class="top">
+    <h1>Pose editor</h1>
+    <input id="name" type="text" value="new-exercise" aria-label="Clip name" spellcheck="false">
+    <button id="new" type="button">New</button>
+    <select id="open" aria-label="Open a clip"><option value="">Open clip…</option><option value="curl">curl</option><option value="press">press</option><option value="file">From a file…</option></select>
+    <button id="save" type="button">Save clip</button>
+    <span class="grow"></span>
+    <button id="mirror" type="button" class="on">Mirror arms: on</button>
+    <a href="./">Back to viewer</a>
+  </div>
+
+  <div class="help">
+    <b>Drag the dots</b> to pose the arms.<br>
+    <span class="dot" style="background:#ffd27a"></span>hand: moves the whole arm<br>
+    <span class="dot" style="background:#5aa9ff"></span>elbow: turns where the elbow points<br>
+    Drag empty space to turn the camera.<br><br>
+    <b>Dragging creates a keyframe</b> at the playhead. The editor fills in the motion between keyframes.<br><br>
+    Mark the <b>lift</b> on the timeline: the part where the weight goes up. The working muscles come from that part.
+  </div>
+
+  <div class="panel">
+    <h2 id="side-title">Left arm</h2>
+    <div class="sides"><button id="pickL" type="button" class="on">Left</button><button id="pickR" type="button">Right</button></div>
+    <small>At this keyframe</small>
+    <label>Palm faces<select id="palm">
+      <option value="">automatic</option><option value="custom" disabled>from clip</option><option value="forward">forward</option><option value="back">back</option>
+      <option value="in">in (toward body)</option><option value="out">out</option><option value="up">up</option><option value="down">down</option></select></label>
+    <label>Wrist bend<input id="wrist" type="range" min="-60" max="60" step="1" value="0"><span class="val" id="wrist-v">0°</span></label>
+    <label>Grip<input id="grip" type="range" min="0" max="1" step=".05" value="1"><span class="val" id="grip-v">1</span></label>
+    <small>Working in the lift</small>
+    <ul id="working"></ul>
+  </div>
+
+  <div class="timeline">
+    <div class="tl-tools">
+      <button id="play" type="button">Play</button>
+      <span id="time">0.00 s</span>
+      <button id="addkey" type="button">Add keyframe</button>
+      <button id="delkey" type="button">Delete keyframe</button>
+      <span class="grow"></span>
+      <button id="liftstart" type="button">Lift starts here</button>
+      <button id="liftend" type="button">Lift ends here</button>
+      <label style="color:var(--muted)">Length <input id="duration" type="number" min="0.5" max="10" step="0.1" value="3"> s</label>
+    </div>
+    <div class="track" id="track"><div class="ticks" id="ticks"></div><div id="lift"></div><div id="keys"></div><div id="playhead"></div></div>
+  </div>
+
+  <div id="toast"></div>
+  <input id="file" type="file" accept=".json,application/json" hidden>
+  <div id="load">Loading anatomy</div>
+  <script type="module" src="editor.js"></script>
+</body>
+</html>

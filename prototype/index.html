@@ -1,0 +1,77 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Rig Test</title>
+  <script type="importmap">{"imports":{"three":"../vendor/three.module.js","three/addons/":"../vendor/"}}</script>
+  <style>
+    @font-face{font-family:Barlow Condensed;src:url('../fonts/BarlowCondensed-Bold.ttf') format('truetype');font-weight:700}
+    :root{--ink:#f2eee8;--muted:#c2bdb5;--line:#8d8983;--red:#e0603f;--mono:ui-monospace,SFMono-Regular,Consolas,"Liberation Mono",monospace}
+    *{box-sizing:border-box}
+    html,body{margin:0;height:100%;overflow:hidden;background:#4a4846;color:var(--ink);font-family:var(--mono)}
+    body::before{content:"";position:fixed;inset:0;pointer-events:none;
+      background:radial-gradient(ellipse 30% 52% at 50% 50%,rgba(176,170,160,.85) 0%,rgba(130,126,119,.55) 38%,rgba(74,72,70,0) 72%)}
+    #name{position:fixed;left:0;right:0;top:12%;text-align:center;pointer-events:none;user-select:none;
+      font:700 min(26vh,19vw)/.84 "Barlow Condensed","Arial Narrow",Impact,sans-serif;letter-spacing:-.012em;color:#a19c93;opacity:.75}
+    #c{position:fixed;inset:0;width:100%;height:100%;display:block;outline:none;cursor:grab}
+    .top{position:fixed;top:26px;left:0;right:0;padding:0 clamp(22px,3.2vw,52px);display:flex;justify-content:space-between;align-items:flex-start;pointer-events:none}
+    h1{margin:0;font:400 clamp(24px,2.4vw,34px)/1.08 Georgia,"Times New Roman",serif;letter-spacing:-.045em}
+    .top p{margin:9px 0 0;color:var(--muted);font-size:10px;letter-spacing:.17em}
+    nav{display:flex;gap:22px;pointer-events:auto}
+    button{cursor:pointer;appearance:none;color:var(--ink);background:none;border:0;border-bottom:1px solid var(--line);padding:8px 0 9px;font:400 11px/1.2 var(--mono);letter-spacing:.015em}
+    button:hover,button.on{color:#fff;border-color:var(--red)}
+    button.on{border-bottom-width:2px}
+    .side{position:fixed;left:clamp(22px,3.2vw,52px);bottom:90px;width:230px;pointer-events:none}
+    .side h2{margin:0 0 14px;font:400 22px/1.1 Georgia,serif;letter-spacing:-.03em}
+    .side small{display:block;color:var(--muted);font-size:10px;letter-spacing:.17em;margin-bottom:8px}
+    ul{list-style:none;margin:0;padding:0;font-size:11px;letter-spacing:.04em;text-transform:capitalize}
+    li{display:flex;align-items:center;gap:10px;padding:5px 0;border-bottom:1px solid rgba(255,255,255,.08)}
+    li span{width:34px;height:3px;background:linear-gradient(90deg,var(--red) calc(var(--w)*100%),rgba(255,255,255,.12) 0)}
+    .bottom{position:fixed;bottom:28px;left:0;right:0;padding:0 clamp(22px,3.2vw,52px);display:flex;align-items:center;gap:22px}
+    .rep{flex:1;height:1px;background:rgba(255,255,255,.18);position:relative}
+    #bar{position:absolute;inset:0;background:var(--red);transform-origin:left;transform:scaleX(0)}
+    .bottom .hint{color:var(--muted);font-size:10px;letter-spacing:.12em}
+    #load{position:fixed;inset:0;display:flex;align-items:center;justify-content:center;background:#4a4846;color:var(--muted);font-size:11px;letter-spacing:.14em;text-transform:uppercase}
+    #xray-panel{position:fixed;right:clamp(22px,3.2vw,52px);top:90px;width:300px;font-size:11px;letter-spacing:.03em;background:rgba(40,38,36,.72);backdrop-filter:blur(6px);padding:14px 16px;border-radius:2px}
+    #xray-panel small{display:block;color:var(--muted);font-size:10px;letter-spacing:.17em;margin-bottom:8px}
+    #xray-panel .key{display:flex;gap:14px;margin-bottom:8px;color:var(--muted);font-size:10px}
+    #xray-panel .key span::before{content:"";display:inline-block;width:8px;height:8px;border-radius:50%;margin-right:5px;vertical-align:-1px}
+    .k-short::before{background:#ff5b3a}.k-long::before{background:#5aa9ff}.k-work::before{background:none!important;border:1px solid #fff}
+    #xray-rows li{display:grid;grid-template-columns:1fr 70px 52px;gap:8px;padding:5px 4px;cursor:default;text-transform:capitalize;border-bottom:1px solid rgba(255,255,255,.07)}
+    #xray-rows li.focus{background:rgba(255,255,255,.08)}
+    #xray-rows li.work .n::after{content:" \25CF";color:#fff;font-size:8px;vertical-align:1px}
+    #xray-rows li span{width:auto;height:auto;background:none}
+    #xray-rows .n{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+    #xray-rows .b{align-self:center;height:3px!important;background:rgba(255,255,255,.1)!important;position:relative}
+    #xray-rows .b i{position:absolute;inset:0;transform-origin:left;transform:scaleX(var(--w))}
+    #xray-rows .short .b i{background:#ff5b3a}#xray-rows .long .b i{background:#5aa9ff}
+    #xray-rows .v{text-align:right;font-variant-numeric:tabular-nums}
+    #xray-rows .empty{display:block;color:var(--muted)}
+    #xray-panel p{margin:10px 0 0;color:var(--muted);font-size:10px;line-height:1.5}
+    body.xray #name{opacity:.25}
+    [hidden]{display:none!important}
+  </style>
+</head>
+<body>
+  <div id="name" aria-hidden="true">BICEPS</div>
+  <canvas id="c" tabindex="0" aria-label="Muscle model performing the selected exercise. Drag to orbit, scroll to zoom."></canvas>
+  <div class="top">
+    <div><h1>Muscle model</h1><p>RIG TEST / PHASE 2</p></div>
+    <nav><button data-ex="curl" type="button">Dumbbell curl</button><button data-ex="press" type="button">Overhead press</button><button data-ex="pullup" type="button">Pull up</button><button data-ex="dbsquat" type="button">Dumbbell squat</button><button data-ex="bench" type="button">Bench press</button><a href="editor.html" style="color:var(--muted);font-size:11px;align-self:center">Pose editor</a></nav>
+  </div>
+  <div class="side"><small>NOW PLAYING</small><h2 id="ex-title">Dumbbell curl</h2><small>WORKING</small><ul id="working"></ul></div>
+  <div class="bottom">
+    <button id="pause" type="button">Pause</button><button id="slow" type="button">Slow motion</button><button id="xray" type="button">X-ray: off</button>
+    <div class="rep"><div id="bar"></div></div><span class="hint">DRAG TO ORBIT · SCROLL TO ZOOM</span>
+  </div>
+  <aside id="xray-panel" hidden>
+    <small>MUSCLE LENGTH NOW VS REST</small>
+    <div class="key"><span class="k-short">shorter</span><span class="k-long">longer</span><span class="k-work">working</span></div>
+    <ul id="xray-rows"></ul>
+    <p>Each muscle is a line through 3 points stuck to bones: origin, middle, insertion. Hover a row to find its line.</p>
+  </aside>
+  <div id="load"><span id="load-text">Loading anatomy</span></div>
+  <script type="module" src="main.js"></script>
+</body>
+</html>

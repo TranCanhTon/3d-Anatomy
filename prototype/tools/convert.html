@@ -1,0 +1,46 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Video To Clip</title>
+  <script type="importmap">{"imports":{"three":"../../vendor/three.module.js","three/addons/":"../../vendor/"}}</script>
+  <style>
+    body{margin:0;min-height:100vh;background:#3e3c3a;color:#f2eee8;font:13px/1.6 ui-monospace,Consolas,monospace;display:grid;place-items:center}
+    main{width:min(560px,92vw);background:rgba(30,28,27,.9);padding:28px;border-radius:3px}
+    h1{margin:0 0 4px;font:400 26px Georgia,serif;letter-spacing:-.03em} p{color:#b9b3ab;margin:0 0 18px}
+    label{display:grid;grid-template-columns:150px 1fr;gap:10px;align-items:center;margin:9px 0;color:#b9b3ab}
+    input,select{font:inherit;color:#f2eee8;background:rgba(0,0,0,.3);border:1px solid rgba(255,255,255,.15);border-radius:2px;padding:6px 8px}
+    button{margin-top:16px;font:inherit;color:#f2eee8;background:none;border:0;border-bottom:2px solid #e0603f;padding:7px 0;cursor:pointer}
+    #out{margin-top:16px;white-space:pre-wrap;color:#d8d2ca}
+  </style>
+</head>
+<body>
+<main>
+  <h1>Video to clip</h1>
+  <p>Step 2 of the video pipeline. Step 1 is <code>track_video.py</code>, which makes the track file.</p>
+  <label>Track file<input id="track" type="file" accept=".json"></label>
+  <label>First frame<input id="from" type="number" value="360"></label>
+  <label>Last frame<input id="to" type="number" value="455"></label>
+  <label>Clip name<input id="name" type="text" value="pullup"></label>
+  <label>Hands hold<select id="hold"><option value="bar">a fixed bar (pull up, chin up)</option><option value="">weights that move (curl, press)</option></select></label>
+  <button id="go" type="button">Make clip</button>
+  <div id="out">Loading rig…</div>
+</main>
+<script type="module">
+  import { Rig } from '../rig.js';
+  import { videoToClip } from './video-to-clip.js';
+  const $ = (id) => document.getElementById(id);
+  const [data, bin] = await Promise.all([fetch('../rig.json').then((r) => r.json()), fetch('../rig.bin').then((r) => r.arrayBuffer())]);
+  const rig = new Rig(data, bin); $('out').textContent = 'Ready. Pick the track file and the frames of one clean rep (start at the bottom of the lift).';
+  $('go').onclick = async () => {
+    const f = $('track').files[0]; if (!f) return ($('out').textContent = 'Pick a track file first.');
+    const track = JSON.parse(await f.text());
+    const clip = videoToClip(track, rig, { from: +$('from').value, to: +$('to').value, name: $('name').value.trim(), hold: $('hold').value || null, video: track.video });
+    const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([JSON.stringify(clip)], { type: 'application/json' }));
+    a.download = clip.name + '.json'; a.click();
+    $('out').textContent = `Made ${clip.name}.json: ${clip.frames} frames, ${clip.lifting.filter(Boolean).length} lifting.\nPut it in prototype/clips/ and add a line to exercises.js, for example:\n  ${clip.name}: { title: '${clip.name}', clip: 'clips/${clip.name}.json', equipment: '${clip.equipment ? 'bar' : 'dumbbells'}' },`;
+  };
+</script>
+</body>
+</html>
