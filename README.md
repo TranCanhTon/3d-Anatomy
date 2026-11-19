@@ -116,4 +116,15 @@ adaptations.
 - Three.js 0.160.0: MIT; see `vendor/THREE-LICENSE.txt`.
 - Barlow Condensed Bold: SIL Open Font License; see `fonts/BarlowCondensed-OFL.txt`.
 
+The chin up motion was recovered from a video with **FlowHMR** (non-commercial license), which uses
+**SAM 3D Body** (Meta, SAM License), **VGGT-Omega** (Meta, FAIR Noncommercial Research License) and the
+**SMPL-H** body model (Max Planck Institute for Intelligent Systems, non-commercial). Non-commercial use
+only; the credit also shows in the exercise panel. See `prototype/tools/FLOWHMR.md`. The other exercises'
+sources are credited in `prototype/README.md`.
+
+- FlowHMR: https://github.com/flowhmr/flowhmr
+- SAM 3D Body: https://github.com/facebookresearch/sam-3d-body
+- VGGT-Omega: https://github.com/facebookresearch/vggt-omega
+- SMPL-H: https://mano.is.tue.mpg.de
+
 The type is inspired by the supplied reference; no logo or branded artwork is used.

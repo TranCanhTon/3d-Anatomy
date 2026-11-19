@@ -13,8 +13,9 @@ py -m http.server 8000
 
 Open **http://localhost:8000/prototype/**.
 
-- **Dumbbell curl**, **Overhead press**, **Pull up**, **Dumbbell squat** and **Bench press** switch the exercise.
-  The pull up comes from a video, the squat and bench press from the motion capture pack.
+- **Dumbbell curl**, **Overhead press**, **Pull up**, **Chin up**, **Dumbbell squat** and **Bench press** switch the
+  exercise. The pull up (MediaPipe) and chin up (FlowHMR) come from videos, the squat and bench press from the
+  motion capture pack.
 - Drag to orbit, scroll to zoom. **Slow motion** plays at 0.3x.
 - The working muscles glow and swell a little on the lift.
 - **X-ray** (bottom bar) cycles: bones (white, what a clip moves), muscle lines (the 3 points
@@ -164,8 +165,30 @@ The page measures the line every frame.
 - `rig.js` builds the skeleton and solves the arms: two bone IK with an elbow direction,
   a shoulder blade that rotates with arm height, forearm twist to face the palm, and a closed grip.
 
+## Video to clip with FlowHMR (chin up)
+
+The chin up (what the lats open on the front screen) comes from `pulluppullp.mp4` through FlowHMR, which
+recovers whole body 3D motion (SMPL-H) from a video. It runs on Google Colab; the full guide, including how
+to add another exercise this way, is `tools/FLOWHMR.md`.
+
+`tools/smplh_to_clip.py` (Python, numpy and scipy) turns the FlowHMR result into a clip:
+- turns the body to face +Z and copies each SMPL-H joint's turn onto our bone, with a fixed offset per bone
+  that lines up both rest poses (SMPL-H stands in a T-pose), like `fbx-to-clip.js`;
+- spine: our spine takes spine1, our chest takes spine3 (spine2 folded in); the shoulder blade follows the
+  arm height; the hand closes on the bar;
+- moves the whole body so the grip stays on the bar (FlowHMR keeps the feet on the floor), pins each hand to
+  a fixed spot with an arm solve, and tilts the body about the bar so its centre of mass hangs under the hands;
+- cuts from the start of the first lift to the end and blends the end into the start.
+
+Known limit: FlowHMR arches the back at the bottom of the rep, so the body leans back up to 33 degrees and a
+few lower back tendon strips poke out there.
+
+The old MediaPipe pull up stays in `exercises.js` and the viewer (Pull up button) until it is deleted.
+
 ## Credits
 
+- Chin up motion: FlowHMR (non-commercial), SAM 3D Body (Meta, SAM License), VGGT-Omega (Meta, FAIR
+  Noncommercial Research License), SMPL-H body model (MPI, non-commercial).
 - Pose tracking model: Google MediaPipe BlazePose (Apache 2.0).
 - Motion capture: Wolff's Studio, Workout Animations Part 1 (itch.io).
 - Exercise muscle lists: free-exercise-db (public domain).

@@ -1,0 +1,15 @@
+# FlowHMR: body model, tokens, weights and source videos never go in the repo
+smplh/
+smplh*.tar.xz
+**/model.npz
+*.ckpt
+*.pth
+*.pt
+*.safetensors
+.env
+*.token
+hf_token*
+flowhmr_results*.zip
+prototype/tools/flowhmr_out/
+*.mp4
+*.mov

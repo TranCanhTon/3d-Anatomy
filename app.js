@@ -653,6 +653,7 @@ async function openExercise() {
     .slice(0, 4)
     .map(([k, v]) => `<li><span style="--w:${v}"></span>${muscleLabel(k)}</li>`)
     .join("");
+  $("ex-credit").textContent = info.credit;
   panel.hidden = false;
   $("ex-controls").hidden = false;
   $("step").textContent = "03 / EXERCISE";

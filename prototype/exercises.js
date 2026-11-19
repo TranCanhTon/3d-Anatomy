@@ -15,6 +15,9 @@ export const EXERCISES = {
     db: 'Dumbbell_Shoulder_Press', primary: ['shoulders'], secondary: ['triceps'] },
   pullup: { title: 'Pull up', clip: 'clips/pullup.json', equipment: 'bar', // from video (pull-up.mp4)
     db: 'Pullups', primary: ['lats'], secondary: ['biceps', 'middle back'] },
+  chinup: { title: 'Chin up', clip: 'clips/chinup.json', equipment: 'bar', // FlowHMR from video (pulluppullp.mp4), tools/smplh_to_clip.py
+    db: 'Chin-Up', primary: ['lats'], secondary: ['biceps', 'forearms', 'middle back'],
+    credit: 'Motion: FlowHMR (non-commercial), SAM 3D Body (Meta, SAM License), VGGT-Omega (Meta, FAIR Noncommercial Research License), SMPL-H (MPI, non-commercial)' },
   dbsquat: { title: 'Dumbbell squat', clip: 'clips/dbsquat.json', equipment: 'dumbbells', // mocap pack, Anim_Bodybuilding02
     db: 'Dumbbell_Squat', primary: ['quadriceps'], secondary: ['calves', 'glutes', 'hamstrings', 'lower back'] },
   bench: { title: 'Bench press', clip: 'clips/bench.json', equipment: 'barbell', // mocap pack, Anim_Bodybuilding48 (arms put on a barbell)
