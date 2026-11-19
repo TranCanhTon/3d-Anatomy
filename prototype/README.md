@@ -13,9 +13,9 @@ py -m http.server 8000
 
 Open **http://localhost:8000/prototype/**.
 
-- **Dumbbell curl**, **Overhead press**, **Pull up**, **Chin up**, **Dumbbell squat** and **Bench press** switch the
-  exercise. The pull up (MediaPipe) and chin up (FlowHMR) come from videos, the squat and bench press from the
-  motion capture pack.
+- **Dumbbell curl**, **Overhead press**, **Pull up**, **Chin up**, **Dumbbell squat**, **Bench press** and
+  **Bench press (mocap)** switch the exercise. The pull up (MediaPipe), chin up and bench press (FlowHMR) come
+  from videos, the squat and the old bench press from the motion capture pack.
 - Drag to orbit, scroll to zoom. **Slow motion** plays at 0.3x.
 - The working muscles glow and swell a little on the lift.
 - **X-ray** (bottom bar) cycles: bones (white, what a clip moves), muscle lines (the 3 points
@@ -49,6 +49,11 @@ Open **http://localhost:8000/prototype/editor.html** (or the link in the viewer)
 The squat comes from the Wolff's Studio workout pack (`D:\Download\WorkoutAnimations`, 48 gym and
 32 stretching animations, one rep each). Use the files in its `Unity` folder.
 
+To see what's in the pack, open `http://localhost:8000/prototype/tools/pack-preview.html` and choose the
+`Unity` folder: every animation loops as a stick figure (the pack's character mesh doesn't deform right in
+FBXLoader, so it draws the skeleton the converter reads). Click tiles to pick them and copy the list.
+The pack has only one bench press (48, captured with dumbbells).
+
 Open `http://localhost:8000/prototype/tools/pack.html`, pick an animation, a name, the equipment and
 whether the feet stay on the floor. It downloads the clip. Put it in `clips/` and add a line to
 `exercises.js` with the muscles from free-exercise-db.
@@ -66,7 +71,8 @@ How the conversion works (`tools/fbx-to-clip.js`):
   The bar path is raised at the bottom so it touches the chest instead of sinking in (dumbbells go
   lower, beside the chest). The last 6% of arm reach is eased so the elbows don't snap at lockout.
   The viewer puts the barbell on the grip points every frame and a bench under the back.
-  The bench press is file 48 made this way.
+  The old bench press (Bench press (mocap)) is file 48 made this way. Forcing dumbbell motion onto a bar
+  gave a 78 cm grip and tilted forearms, so the chest now opens the FlowHMR bench press instead.
 - The clip starts at the bottom of the lift. The lift is when the hands (with weights) or the body
   (bodyweight) go up.
 - The pack's files are numbered, not named: 01 bodyweight squat, 02 dumbbell squat (dumbbells on the
@@ -165,29 +171,35 @@ The page measures the line every frame.
 - `rig.js` builds the skeleton and solves the arms: two bone IK with an elbow direction,
   a shoulder blade that rotates with arm height, forearm twist to face the palm, and a closed grip.
 
-## Video to clip with FlowHMR (chin up)
+## Video to clip with FlowHMR (chin up, bench press)
 
-The chin up (what the lats open on the front screen) comes from `pulluppullp.mp4` through FlowHMR, which
-recovers whole body 3D motion (SMPL-H) from a video. It runs on Google Colab; the full guide, including how
-to add another exercise this way, is `tools/FLOWHMR.md`.
+The chin up (what the lats open on the front screen) comes from `pulluppullp.mp4`, the bench press (what the
+chest opens) from a bench press illustration video, both through FlowHMR, which recovers whole body 3D motion
+(SMPL-H) from a video. It runs on Google Colab; the full guide, including how to add another exercise this
+way, is `tools/FLOWHMR.md`.
 
 `tools/smplh_to_clip.py` (Python, numpy and scipy) turns the FlowHMR result into a clip:
-- turns the body to face +Z and copies each SMPL-H joint's turn onto our bone, with a fixed offset per bone
-  that lines up both rest poses (SMPL-H stands in a T-pose), like `fbx-to-clip.js`;
+- copies each SMPL-H joint's turn onto our bone, with a fixed offset per bone that lines up both rest poses
+  (SMPL-H stands in a T-pose), like `fbx-to-clip.js`;
 - spine: our spine takes spine1, our chest takes spine3 (spine2 folded in); the shoulder blade follows the
   arm height; the hand closes on the bar;
-- moves the whole body so the grip stays on the bar (FlowHMR keeps the feet on the floor), pins each hand to
-  a fixed spot with an arm solve, and tilts the body about the bar so its centre of mass hangs under the hands;
-- cuts from the start of the first lift to the end and blends the end into the start.
+- `--mode hang` (chin up): faces +Z, moves the whole body so the grip stays on the bar (FlowHMR keeps the feet
+  on the floor), pins each hand to a fixed spot with an arm solve, and tilts the body about the bar so its
+  centre of mass hangs under the hands;
+- `--mode bench`: lays the body flat on its back (head toward -Z), one height that puts the feet on the floor,
+  a bench under the back, both hands on one straight bar at a fixed grip width following the video's path;
+- cuts from the bottom of the first rep to the bottom after the last complete rep and blends the end into
+  the start.
 
-Known limit: FlowHMR arches the back at the bottom of the rep, so the body leans back up to 33 degrees and a
-few lower back tendon strips poke out there.
+Known limits: the chin up arches the back at the bottom of the rep (the body leans back up to 33 degrees and
+a few lower back tendon strips poke out). The bench press elbows open to about 129 degrees at the top, not a
+full lockout. On both, the fingers don't wrap the bar properly yet.
 
 The old MediaPipe pull up stays in `exercises.js` and the viewer (Pull up button) until it is deleted.
 
 ## Credits
 
-- Chin up motion: FlowHMR (non-commercial), SAM 3D Body (Meta, SAM License), VGGT-Omega (Meta, FAIR
+- Chin up and bench press motion: FlowHMR (non-commercial), SAM 3D Body (Meta, SAM License), VGGT-Omega (Meta, FAIR
   Noncommercial Research License), SMPL-H body model (MPI, non-commercial).
 - Pose tracking model: Google MediaPipe BlazePose (Apache 2.0).
 - Motion capture: Wolff's Studio, Workout Animations Part 1 (itch.io).

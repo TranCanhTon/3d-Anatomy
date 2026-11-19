@@ -1,0 +1,157 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Pack preview</title>
+  <script type="importmap">{"imports":{"three":"../../vendor/three.module.js","three/addons/":"../../vendor/"}}</script>
+  <style>
+    :root{--bg:#1f1c1a;--tile:#2b2725;--ink:#f2eee8;--muted:#9a928b;--line:rgba(255,255,255,.12);--pick:#33d1c1}
+    *{box-sizing:border-box}
+    html,body{margin:0;background:var(--bg);color:var(--ink);font:13px/1.45 ui-monospace,Consolas,monospace}
+    header{position:sticky;top:0;z-index:3;display:flex;flex-wrap:wrap;gap:12px 20px;align-items:center;padding:14px 16px;background:rgba(31,28,26,.94);border-bottom:1px solid var(--line)}
+    h1{margin:0;font:400 22px/1 Georgia,serif;letter-spacing:-.02em}
+    header p{margin:0;color:var(--muted);max-width:60ch}
+    label.pickdir{cursor:pointer;border-bottom:2px solid #e0603f;padding:4px 0}
+    label.pickdir input{display:none}
+    #status{color:var(--muted)}
+    #grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(190px,1fr));gap:10px;padding:14px 16px 90px}
+    .tile{position:relative;background:var(--tile);border:1px solid var(--line);border-radius:3px;cursor:pointer;user-select:none}
+    .tile .view{aspect-ratio:1/1.15}
+    .tile .cap{display:flex;justify-content:space-between;padding:6px 8px;border-top:1px solid var(--line)}
+    .tile .cap span:last-child{color:var(--muted)}
+    .tile.on{border-color:var(--pick);box-shadow:0 0 0 1px var(--pick) inset}
+    .tile.on .cap span:first-child{color:var(--pick)}
+    #c{position:fixed;inset:0;width:100%;height:100%;z-index:2;pointer-events:none}
+    footer{position:fixed;left:0;right:0;bottom:0;z-index:3;display:flex;gap:14px;align-items:center;padding:12px 16px;background:rgba(31,28,26,.96);border-top:1px solid var(--line)}
+    #picked{flex:1;overflow-wrap:anywhere}
+    button{font:inherit;color:var(--ink);background:none;border:0;border-bottom:2px solid var(--pick);padding:4px 0;cursor:pointer}
+    @media (max-width:520px){#grid{grid-template-columns:repeat(2,1fr)}}
+  </style>
+</head>
+<body>
+<header>
+  <h1>Workout pack preview</h1>
+  <p>Pick the pack's <b>Unity</b> folder (D:\Download\WorkoutAnimations\WorkoutAnimations\Unity). Every animation loops in its own tile. Click a tile to pick it.</p>
+  <label class="pickdir">Choose folder<input id="dir" type="file" webkitdirectory multiple accept=".fbx"></label>
+  <label class="pickdir">or files<input id="files" type="file" multiple accept=".fbx"></label>
+  <span id="status">Nothing loaded.</span>
+</header>
+<main id="grid"></main>
+<canvas id="c"></canvas>
+<footer><span id="picked">Picked: none</span><button id="copy" type="button">Copy list</button></footer>
+<script type="module">
+  import * as THREE from 'three';
+  import { FBXLoader } from 'three/addons/loaders/FBXLoader.js';
+
+  // One renderer for the whole page; each tile is drawn into its own rectangle (scissor), and only
+  // tiles on screen are drawn, so 81 animations stay smooth on integrated graphics.
+  const $ = (id) => document.getElementById(id);
+  const renderer = new THREE.WebGLRenderer({ canvas: $('c'), antialias: true, alpha: true });
+  renderer.setPixelRatio(Math.min(devicePixelRatio, 1.5));
+  const body = new THREE.MeshStandardMaterial({ color: '#c9c2b9', roughness: .7 });
+  const tiles = [], picked = new Set(), clock = new THREE.Clock();
+
+  function makeScene() {
+    const scene = new THREE.Scene();
+    scene.add(new THREE.HemisphereLight('#fff6ec', '#3a3330', 2.2));
+    const sun = new THREE.DirectionalLight('#ffffff', 2.2); sun.position.set(2, 4, 3); scene.add(sun);
+    return scene;
+  }
+
+  // Frame the whole motion: bones' bounding box over several moments of the animation.
+  function fit(obj, mixer, dur, camera) {
+    const box = new THREE.Box3(), p = new THREE.Vector3();
+    for (let i = 0; i <= 8; i++) {
+      mixer.setTime(dur * i / 8); obj.updateMatrixWorld(true);
+      obj.traverse((o) => { if (o.isBone) box.expandByPoint(o.getWorldPosition(p)); });
+    }
+    mixer.setTime(0);
+    const size = box.getSize(new THREE.Vector3()), c = box.getCenter(new THREE.Vector3());
+    const r = Math.max(size.y, size.x, size.z) * .62 + size.y * .08, dist = r / Math.tan(THREE.MathUtils.degToRad(camera.fov / 2));
+    const dir = new THREE.Vector3(.75, .32, 1).normalize();
+    camera.position.copy(c).addScaledVector(dir, dist); camera.lookAt(c);
+    camera.near = dist / 50; camera.far = dist * 10; camera.updateProjectionMatrix();
+    return Math.max(size.y, size.x, size.z * .6, 1e-3);
+  }
+
+  function addTile(name, fbx) {
+    const num = (name.match(/(\d+)\.fbx$/i) || [, name])[1];
+    const el = document.createElement('div'); el.className = 'tile'; el.dataset.num = num;
+    const clip = fbx.animations[0], dur = clip ? clip.duration : 0;
+    el.innerHTML = `<div class="view"></div><div class="cap"><span>${num}</span><span>${dur ? dur.toFixed(1) + ' s' : 'no animation'}</span></div>`;
+    el.title = name;
+    el.onclick = () => { el.classList.toggle('on'); el.classList.contains('on') ? picked.add(num) : picked.delete(num); showPicked(); };
+    $('grid').append(el);
+    // The pack's character mesh doesn't deform right in FBXLoader, so draw the skeleton instead (the same
+    // bones the clip converter reads): a rod from every bone to its parent, a ball for the head.
+    fbx.traverse((o) => { if (o.isMesh) o.visible = false; });
+    const scene = makeScene(); scene.add(fbx);
+    const camera = new THREE.PerspectiveCamera(30, 1, .1, 100), mixer = new THREE.AnimationMixer(fbx);
+    if (clip) mixer.clipAction(clip).play();
+    const height = fit(fbx, mixer, dur, camera);
+    const pairs = [], rod = new THREE.CylinderGeometry(1, 1, 1, 8), ball = new THREE.SphereGeometry(1, 16, 12);
+    fbx.traverse((o) => {
+      if (!o.isBone || !o.parent?.isBone || /finger|thumb|toe_end|_end$/i.test(o.name)) return;
+      const m = new THREE.Mesh(rod, body); scene.add(m); pairs.push([o.parent, o, m]);
+    });
+    let head = null; fbx.traverse((o) => { if (o.isBone && /^head$/i.test(o.name)) head = o; });
+    const headBall = new THREE.Mesh(ball, body); headBall.scale.setScalar(height * .055); scene.add(headBall);
+    const a = new THREE.Vector3(), b = new THREE.Vector3(), up = new THREE.Vector3(0, 1, 0), r = height * .016;
+    const pose = () => {
+      fbx.updateMatrixWorld(true);
+      for (const [p, c, m] of pairs) {
+        p.getWorldPosition(a); c.getWorldPosition(b); const len = a.distanceTo(b);
+        m.visible = len > 1e-4; if (!m.visible) continue;
+        m.position.addVectors(a, b).multiplyScalar(.5); m.scale.set(r, len, r);
+        m.quaternion.setFromUnitVectors(up, b.sub(a).divideScalar(len));
+      }
+      if (head) headBall.position.copy(head.getWorldPosition(a)).addScaledVector(up, height * .05);
+    };
+    tiles.push({ el, view: el.querySelector('.view'), scene, camera, mixer, num, pose });
+  }
+
+  function showPicked() {
+    const list = [...picked].sort((a, b) => a.localeCompare(b, undefined, { numeric: true }));
+    $('picked').textContent = list.length ? `Picked (${list.length}): ${list.join(', ')}` : 'Picked: none';
+  }
+  $('copy').onclick = () => navigator.clipboard?.writeText([...picked].sort((a, b) => a.localeCompare(b, undefined, { numeric: true })).join(', '));
+
+  async function load(fileList) {
+    const files = [...fileList].filter((f) => /\.fbx$/i.test(f.name) && !/props/i.test(f.webkitRelativePath || ''))
+      .sort((a, b) => a.name.localeCompare(b.name, undefined, { numeric: true }));
+    $('grid').innerHTML = ''; tiles.length = 0; picked.clear(); showPicked();
+    const loader = new FBXLoader();
+    for (let i = 0; i < files.length; i++) {
+      $('status').textContent = `Loading ${i + 1} / ${files.length}: ${files[i].name}`;
+      try { addTile(files[i].name, loader.parse(await files[i].arrayBuffer(), '')); }
+      catch (e) { console.warn(files[i].name, e); }
+      await new Promise((r) => setTimeout(r)); // let the page draw while loading
+    }
+    $('status').textContent = `${tiles.length} animations loaded.`;
+  }
+  $('dir').onchange = (e) => load(e.target.files);
+  $('files').onchange = (e) => load(e.target.files);
+
+  function frame() {
+    const dt = Math.min(clock.getDelta(), .1), w = innerWidth, h = innerHeight;
+    if (renderer.domElement.width !== Math.floor(w * renderer.getPixelRatio())) renderer.setSize(w, h, false);
+    renderer.setScissorTest(false); renderer.setClearColor(0, 0); renderer.clear();
+    renderer.setScissorTest(true);
+    for (const t of tiles) {
+      const r = t.view.getBoundingClientRect();
+      if (r.bottom < 0 || r.top > h || r.right < 0 || r.left > w) continue; // off screen
+      t.mixer.update(dt); t.pose();
+      t.camera.aspect = r.width / r.height; t.camera.updateProjectionMatrix();
+      const y = h - r.bottom;
+      renderer.setViewport(r.left, y, r.width, r.height); renderer.setScissor(r.left, y, r.width, r.height);
+      renderer.setClearColor('#2b2725', 1); renderer.clear();
+      renderer.render(t.scene, t.camera);
+    }
+    requestAnimationFrame(frame);
+  }
+  requestAnimationFrame(frame);
+  window.packPreview = { load, get tiles() { return tiles; } }; // for headless checks
+</script>
+</body>
+</html>

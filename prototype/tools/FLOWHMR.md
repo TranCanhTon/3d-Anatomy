@@ -38,8 +38,12 @@ You need three things on your PC:
 | 3 | Downloads the models | Paste your token in the box, press Enter (it stays hidden) | 5+ min |
 | 4 | SMPL-H body model | Click **Choose Files**, pick `smplh.tar.xz` | 1 to 3 min |
 | 5 | Startup check | Every line should say `ok` | seconds |
-| 6 | Cuts the video into pieces | Click **Choose Files**, pick `pulluppullp.mp4` | seconds |
-| 7 | Runs FlowHMR on each piece | Nothing, wait | 5 to 15 min per piece |
+| 6 | Cuts the video(s) into pieces | Click **Choose Files**, pick one or more videos (mp4, mov, webm) | seconds |
+| 7 | Runs FlowHMR on each piece | Nothing, wait. Every piece should say `followed: the person` | 2 to 5 min per piece |
+
+Cell 6 uses each whole video (up to 30 s) as one piece, named after the file. To use only part of
+a video, fill in `CUTS` at the top of cell 6 (seconds). The original TikTok pull up video
+(`pulluppullp.mp4`) is recognised and cut into its four pieces with the menu bar covered.
 | 8 | Downloads `flowhmr_results.zip` | Send the zip back | seconds |
 
 Tip for cells 4 and 6: instead of the upload button you can open the folder icon on the left and
@@ -125,24 +129,37 @@ FlowHMR keeps the feet on the floor (it was trained on people standing), so the 
 standing pulldown with the right arm and body pose. `smplh_to_clip.py` hangs it from the bar. In the
 result the centre of mass sits under the hands (the old MediaPipe pull up: 20 to 32 cm behind them).
 
+## The bench press video
+
+A 12 s bench press illustration (grey anatomy figure, captions at the top, 576 x 1024). No cover
+needed. The tracker held the body for frames 26 to 234 (7 s); FlowHMR made 3 clean reps lying on
+the bench, 9 degrees head down, feet on the floor. Converted with `--mode bench`: medium grip
+(56 cm), the bar touches 4 cm above the chest, feet within 1 cm of the floor. The chest opens it.
+
 ## Adding another exercise from a video
 
 1. **Pick the stretch.** One person, whole body in view most of the time, 2 to 10 s with at least one
    full rep. Find cut points by looking at frames (`ffmpeg -vf "fps=2,tile=10x6"` makes a contact sheet)
    and hard cuts with `ffmpeg -vf "scdet=threshold=8"`. Cover any on-screen figures, icons or other
    people with `drawbox`, like the menu bar above.
-2. **Edit cell 6** of the notebook: the `PIECES` list (name, first frame, last frame) and `MASK`.
-3. **Run the notebook** (cells 1 to 8). In cell 7, every piece must say `followed: mannequin` (or the
-   person) and the tracked frames should cover most of the piece. Download the zip.
+2. **Upload it in cell 6.** The whole video (up to 30 s) is used by default. To use only part of it,
+   fill in `CUTS` at the top of cell 6 (seconds). Several videos can go in one run.
+3. **Run the notebook** (cells 1 to 8). In cell 7, every piece must say `followed: the person` and the
+   tracked frames should cover most of the piece. Download the zip.
 4. **Convert** (from the project folder; the SMPL-H file is `neutral/model.npz` from `smplh.tar.xz`):
 
    ```bash
    python prototype/tools/smplh_to_clip.py flowhmr_results/chinup/flowhmr_latest.npz path/to/neutral/model.npz prototype/clips/chinup.json --name chinup
    ```
 
-   It prints the joint map, how far the hands drifted before locking, the cut, and the centre of mass
-   before and after. It is written for exercises that hang from a bar. A standing exercise needs the
-   feet pinned instead (like `fbx-to-clip.js` does); that is not built yet.
+   ```bash
+   python prototype/tools/smplh_to_clip.py flowhmr_results/benchvideo/flowhmr_latest.npz path/to/neutral/model.npz prototype/clips/fbench.json --name fbench --mode bench
+   ```
+
+   It prints the joint map, how far the hands drifted before locking, the cut, and a physics check
+   (hang: centre of mass vs the hands; bench: feet vs the floor, bar vs the chest). Modes: `hang`
+   (bar overhead) and `bench` (lying on a bench, barbell). Standing exercises need the feet pinned
+   (like `fbx-to-clip.js` does); that mode is not built yet.
 5. **Register it**: add a line to `prototype/exercises.js` with the muscle lists from free-exercise-db
    (`db`, `primary`, `secondary`) and the `credit`. Never let the motion alone pick the muscles.
    To open it from the front screen, point a muscle at it in `MUSCLE_EXERCISE` in `exercise-mode.js`.

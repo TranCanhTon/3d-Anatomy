@@ -19,7 +19,7 @@ export const MUSCLE_EXERCISE = {
   'biceps/long_head': 'curl', 'biceps/short_head': 'curl', 'biceps/brachialis': 'curl',
   'shoulders/front': 'press',
   'lats/lats': 'chinup', // FlowHMR motion; the old MediaPipe pull up is still in exercises.js
-  'chest/upper': 'bench', 'chest/middle': 'bench', 'chest/lower': 'bench',
+  'chest/upper': 'fbench', 'chest/middle': 'fbench', 'chest/lower': 'fbench', // FlowHMR; the mocap bench is still in exercises.js
 };
 // muscles.json swaps the trap labels; show the real names
 const NAMES = { 'traps/lower': 'Upper traps', 'traps/upper': 'Lower traps' };

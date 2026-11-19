@@ -116,7 +116,7 @@ adaptations.
 - Three.js 0.160.0: MIT; see `vendor/THREE-LICENSE.txt`.
 - Barlow Condensed Bold: SIL Open Font License; see `fonts/BarlowCondensed-OFL.txt`.
 
-The chin up motion was recovered from a video with **FlowHMR** (non-commercial license), which uses
+The chin up and bench press motions were recovered from videos with **FlowHMR** (non-commercial license), which uses
 **SAM 3D Body** (Meta, SAM License), **VGGT-Omega** (Meta, FAIR Noncommercial Research License) and the
 **SMPL-H** body model (Max Planck Institute for Intelligent Systems, non-commercial). Non-commercial use
 only; the credit also shows in the exercise panel. See `prototype/tools/FLOWHMR.md`. The other exercises'

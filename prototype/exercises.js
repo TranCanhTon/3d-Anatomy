@@ -20,8 +20,11 @@ export const EXERCISES = {
     credit: 'Motion: FlowHMR (non-commercial), SAM 3D Body (Meta, SAM License), VGGT-Omega (Meta, FAIR Noncommercial Research License), SMPL-H (MPI, non-commercial)' },
   dbsquat: { title: 'Dumbbell squat', clip: 'clips/dbsquat.json', equipment: 'dumbbells', // mocap pack, Anim_Bodybuilding02
     db: 'Dumbbell_Squat', primary: ['quadriceps'], secondary: ['calves', 'glutes', 'hamstrings', 'lower back'] },
-  bench: { title: 'Bench press', clip: 'clips/bench.json', equipment: 'barbell', // mocap pack, Anim_Bodybuilding48 (arms put on a barbell)
+  bench: { title: 'Bench press (mocap)', clip: 'clips/bench.json', equipment: 'barbell', // mocap pack, Anim_Bodybuilding48 (arms put on a barbell); replaced by fbench
     db: 'Barbell_Bench_Press_-_Medium_Grip', primary: ['chest'], secondary: ['shoulders', 'triceps'] },
+  fbench: { title: 'Bench press', clip: 'clips/fbench.json', equipment: 'barbell', // FlowHMR from video, tools/smplh_to_clip.py --mode bench
+    db: 'Barbell_Bench_Press_-_Medium_Grip', primary: ['chest'], secondary: ['shoulders', 'triceps'],
+    credit: 'Motion: FlowHMR (non-commercial), SAM 3D Body (Meta, SAM License), VGGT-Omega (Meta, FAIR Noncommercial Research License), SMPL-H (MPI, non-commercial)' },
 };
 
 // Holding a dumbbell or a bar always works the grip, which never shows up as shortening.
